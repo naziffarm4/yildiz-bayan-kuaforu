@@ -39,7 +39,7 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Renklendirme & Balyaj");
   const [imageUrl, setImageUrl] = useState("");
-  const [stylist, setStylist] = useState("Yıldız Aksoy");
+  const [stylist, setStylist] = useState("Yıldız Bayan Kuaförü");
   const [description, setDescription] = useState("");
   const [medyaTuru, setMedyaTuru] = useState<"image" | "video">("image");
   const [kapakUrl, setKapakUrl] = useState("");
@@ -51,7 +51,7 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
   const [editTitle, setEditTitle] = useState("");
   const [editCategory, setEditCategory] = useState("Renklendirme & Balyaj");
   const [editImageUrl, setEditImageUrl] = useState("");
-  const [editStylist, setEditStylist] = useState("Yıldız Aksoy");
+  const [editStylist, setEditStylist] = useState("Yıldız Bayan Kuaförü");
   const [editDescription, setEditDescription] = useState("");
   const [editMedyaTuru, setEditMedyaTuru] = useState<"image" | "video">("image");
   const [editKapakUrl, setEditKapakUrl] = useState("");
@@ -64,7 +64,7 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
     setEditTitle(item.baslik);
     setEditCategory(item.kategori);
     setEditImageUrl(item.gorselUrl);
-    setEditStylist(item.stilist || "Yıldız Aksoy");
+    setEditStylist(item.stilist || "Yıldız Bayan Kuaförü");
     setEditDescription(item.aciklama || "");
     setEditMedyaTuru(item.medyaTuru || "image");
     setEditKapakUrl(item.kapakUrl || "");
@@ -111,7 +111,7 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
       baslik: editTitle.trim(),
       kategori: editCategory,
       gorselUrl: editImageUrl.trim(),
-      stilist: editStylist.trim() || "Yıldız Aksoy",
+      stilist: editStylist.trim() || "Yıldız Bayan Kuaförü",
       aciklama: editDescription.trim() || undefined,
       medyaTuru: editMedyaTuru,
       kapakUrl: editKapakUrl.trim() || undefined,
@@ -147,8 +147,8 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
           setItemComments(json.data);
         }
       }
-    } catch {
-      // sessizce geç
+    } catch (err: unknown) {
+      console.warn("Galeri yorumları yüklenemedi:", err);
     } finally {
       setIsCommentsLoading(false);
     }
@@ -225,7 +225,7 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
       baslik: title.trim(),
       kategori: category,
       gorselUrl: imageUrl.trim(),
-      stilist: stylist.trim() || "Yıldız Aksoy",
+      stilist: stylist.trim() || "Yıldız Bayan Kuaförü",
       aciklama: description.trim() || undefined,
       medyaTuru,
       kapakUrl: kapakUrl.trim() || undefined,
@@ -370,7 +370,7 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
                   type="text"
                   value={stylist}
                   onChange={(e) => setStylist(e.target.value)}
-                  placeholder="Örn: Yıldız Aksoy, Elif Yıldırım, Merve Aydın"
+                  placeholder="Örn: Yıldız Bayan Kuaförü, Uzman Stilist"
                   className="w-full px-3 py-2 border border-border rounded-md text-xs bg-white text-text-primary focus:ring-1 focus:ring-accent-gold outline-none"
                 />
               </div>

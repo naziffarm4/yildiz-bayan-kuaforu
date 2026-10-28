@@ -182,7 +182,7 @@ export default function HomePage() {
                   {mainLookbookPhoto?.baslik || "Özel Kesim & Balyaj Tasarımı"}
                 </h3>
                 <p className="text-xs text-gray-300 mt-1 max-w-md">
-                  {mainLookbookPhoto?.stilist || "Yıldız Aksoy Salon Koleksiyonu"}
+                  {mainLookbookPhoto?.stilist || "Yıldız Bayan Kuaförü Özel Koleksiyonu"}
                 </p>
               </div>
             </div>

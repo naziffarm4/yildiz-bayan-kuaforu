@@ -51,19 +51,44 @@ describe("Google Reviews Sync API Routes", () => {
   });
 
   describe("Cron Sync Route (/api/cron/sync-google-reviews)", () => {
-    it("Yetkisiz çağrılarda 401 Unauthorized döner", async () => {
-      const req = new Request("http://localhost/api/cron/sync-google-reviews");
+    it("CRON_SECRET tanımlı değilse 500 hatası döner (S5)", async () => {
+      const origSecret = process.env.CRON_SECRET;
+      delete process.env.CRON_SECRET;
+
+      const req = new Request("http://localhost/api/cron/sync-google-reviews", {
+        headers: {
+          Authorization: "Bearer any-secret",
+        },
+      });
       const res = await CronSyncGET(req);
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(500);
       const json = await res.json();
-      expect(json.error).toContain("Yetkisiz");
+      expect(json.error).toContain("CRON_SECRET");
+
+      if (origSecret) {
+        process.env.CRON_SECRET = origSecret;
+      }
+    });
+
+    it("Yetkisiz çağrılarda veya yalnızca ?secret= query param gönderildiğinde 401 Unauthorized döner (S5)", async () => {
+      process.env.CRON_SECRET = "test-secure-cron-secret-key-2026-min32";
+
+      const reqNoAuth = new Request("http://localhost/api/cron/sync-google-reviews");
+      const resNoAuth = await CronSyncGET(reqNoAuth);
+      expect(resNoAuth.status).toBe(401);
+
+      const reqQueryOnly = new Request(
+        `http://localhost/api/cron/sync-google-reviews?secret=${process.env.CRON_SECRET}`
+      );
+      const resQueryOnly = await CronSyncGET(reqQueryOnly);
+      expect(resQueryOnly.status).toBe(401);
     });
 
     it("Geçerli Bearer CRON_SECRET ile senkronizasyon çalışır", async () => {
-      const secret = process.env.CRON_SECRET || "yildiz-salon-google-sync-cron-key-2026";
+      process.env.CRON_SECRET = "test-secure-cron-secret-key-2026-min32";
       const req = new Request("http://localhost/api/cron/sync-google-reviews", {
         headers: {
-          Authorization: `Bearer ${secret}`,
+          Authorization: `Bearer ${process.env.CRON_SECRET}`,
         },
       });
       const res = await CronSyncGET(req);
@@ -75,11 +100,11 @@ describe("Google Reviews Sync API Routes", () => {
     });
 
     it("POST çağrısı GET metodunu tetikler", async () => {
-      const secret = process.env.CRON_SECRET || "yildiz-salon-google-sync-cron-key-2026";
+      process.env.CRON_SECRET = "test-secure-cron-secret-key-2026-min32";
       const req = new Request("http://localhost/api/cron/sync-google-reviews", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${secret}`,
+          Authorization: `Bearer ${process.env.CRON_SECRET}`,
         },
       });
       const res = await CronSyncPOST(req);

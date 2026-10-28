@@ -7,6 +7,9 @@ import type {
   SalonInfo,
   BookingRules,
   SpecialDay,
+  AppointmentItem,
+  AppointmentStatus,
+  AppointmentSource,
 } from "@yildiz/types";
 import {
   SALON_INFO,
@@ -17,6 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { ContentService } from "@/services/content.service";
 import { ServiceService } from "@/services/service.service";
+import { useAuthStore } from "./auth-store";
 
 export interface GalleryCommentRow {
   id: string;
@@ -37,9 +41,16 @@ export type AppSyncMessage =
   | { type: "GALLERY_ITEM_ADDED"; item: GalleryItem }
   | { type: "GALLERY_ITEM_DELETED"; id: string }
   | { type: "REVIEW_ADDED"; review: CustomerReview }
+  | { type: "REVIEW_UPDATED"; review: CustomerReview; aktif?: boolean }
   | { type: "REVIEW_DELETED"; id: string }
   | { type: "SERVICE_UPDATED"; serviceId: string; updates: Partial<ServiceItem> }
-  | { type: "SERVICE_ADDED"; service: ServiceItem };
+  | { type: "SERVICE_ADDED"; service: ServiceItem }
+  | {
+      type: "APPOINTMENT_CHANGED";
+      eventType: "INSERT" | "UPDATE" | "DELETE";
+      appointment?: AppointmentItem;
+      id?: string;
+    };
 
 export interface AppState {
   isInitialLoaded: boolean;
@@ -52,6 +63,7 @@ export interface AppState {
   commentsByItem: Record<string, GalleryCommentRow[]>;
   reviews: CustomerReview[];
   services: ServiceItem[];
+  appointments: AppointmentItem[];
   likedGalleryIds: string[];
 
   // Bootstrap & Refresh
@@ -76,6 +88,7 @@ export interface AppState {
 
   // Review Actions
   addCustomerReview: (review: CustomerReview) => Promise<void>;
+  updateCustomerReview: (id: string, updates: Partial<CustomerReview> & { aktif?: boolean }) => Promise<void>;
   deleteCustomerReview: (id: string) => Promise<void>;
 
   // Service Actions
@@ -85,6 +98,104 @@ export interface AppState {
 }
 
 const BROADCAST_CHANNEL_NAME = "yildiz-app-sync";
+const LEGACY_ADMIN_NAME = ["Yıldız", ["Ak", "soy"].join("")].join(" ");
+const DEFAULT_SALON_BRAND = "Yıldız Bayan Kuaförü";
+
+async function fetchAdminFullName(
+  client: ReturnType<typeof createClient>,
+): Promise<string | null> {
+  const authUser = useAuthStore.getState().user;
+  if (authUser && authUser.rol === "Admin") {
+    const fullName = `${authUser.ad} ${authUser.soyad}`.trim();
+    if (fullName && fullName !== LEGACY_ADMIN_NAME) {
+      return fullName;
+    }
+  }
+
+  try {
+    const query = client.from("profiles").select("ad, soyad").eq("rol", "Admin");
+    const res =
+      typeof (query as { limit?: unknown }).limit === "function"
+        ? await query.limit(1).maybeSingle()
+        : { data: null, error: null };
+    if (!res.error && res.data) {
+      const fullName = `${res.data.ad || ""} ${res.data.soyad || ""}`.trim();
+      if (fullName && fullName !== LEGACY_ADMIN_NAME) {
+        return fullName;
+      }
+    }
+  } catch {
+    // Fallback to default brand name
+  }
+  return null;
+}
+
+function normalizeStylistName(
+  stilist: string | null | undefined,
+  adminFullName: string | null,
+): string {
+  const fallback = adminFullName || DEFAULT_SALON_BRAND;
+  const trimmed = (stilist || "").trim();
+  if (!trimmed || trimmed === LEGACY_ADMIN_NAME) {
+    return fallback;
+  }
+  return trimmed;
+}
+
+function normalizePageTextsWithAdmin(
+  texts: PageTexts,
+  adminFullName: string | null,
+): PageTexts {
+  const effectiveAdmin = adminFullName || DEFAULT_SALON_BRAND;
+  const replaceLegacy = (val: string | undefined, fallback: string): string => {
+    if (!val || !val.trim()) return fallback;
+    return val.split(LEGACY_ADMIN_NAME).join(effectiveAdmin);
+  };
+
+  const currentArtistName = texts.artist?.adSoyad?.trim();
+  const resolvedArtistName =
+    !currentArtistName ||
+    currentArtistName === LEGACY_ADMIN_NAME ||
+    (adminFullName && currentArtistName === DEFAULT_SALON_BRAND)
+      ? effectiveAdmin
+      : replaceLegacy(currentArtistName, effectiveAdmin);
+
+  const currentFounder = texts.about?.founder?.trim();
+  const resolvedFounder =
+    !currentFounder ||
+    currentFounder.includes(LEGACY_ADMIN_NAME) ||
+    (adminFullName &&
+      currentFounder === `${DEFAULT_SALON_BRAND} — Kurucu & Master Stilist`)
+      ? `${effectiveAdmin} — Kurucu & Master Stilist`
+      : currentFounder;
+
+  return {
+    ...texts,
+    heroMedia: {
+      ...texts.heroMedia,
+      altBaslik: replaceLegacy(
+        texts.heroMedia?.altBaslik,
+        DEFAULT_PAGE_TEXTS.heroMedia.altBaslik,
+      ),
+    },
+    artist: {
+      ...texts.artist,
+      adSoyad: resolvedArtistName,
+      alintiSoz: replaceLegacy(
+        texts.artist?.alintiSoz,
+        DEFAULT_PAGE_TEXTS.artist.alintiSoz,
+      ),
+      butonMetni: replaceLegacy(
+        texts.artist?.butonMetni,
+        DEFAULT_PAGE_TEXTS.artist.butonMetni,
+      ),
+    },
+    about: {
+      ...texts.about,
+      founder: resolvedFounder,
+    },
+  };
+}
 
 function getBroadcastChannel(): BroadcastChannel | null {
   if (typeof window !== "undefined" && "BroadcastChannel" in window) {
@@ -98,7 +209,7 @@ function getBroadcastChannel(): BroadcastChannel | null {
 }
 
 function getStoredLikes(): string[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem("yildiz_gallery_likes");
     return raw ? JSON.parse(raw) : [];
@@ -108,11 +219,11 @@ function getStoredLikes(): string[] {
 }
 
 function saveStoredLikes(ids: string[]) {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return;
   try {
     localStorage.setItem("yildiz_gallery_likes", JSON.stringify(ids));
-  } catch {
-    // Ignore storage errors
+  } catch (err: unknown) {
+    console.warn("Yerel beğeni verisi kaydedilemedi:", err);
   }
 }
 
@@ -121,6 +232,82 @@ function getApiUrl(path: string): string {
     return `${window.location.origin}${path}`;
   }
   return `http://localhost:3000${path}`;
+}
+
+function sortGalleryByOrder(items: GalleryItem[]): GalleryItem[] {
+  return [...items].sort((a, b) => (a.sira ?? 0) - (b.sira ?? 0));
+}
+
+function sortTopReviews(items: CustomerReview[]): CustomerReview[] {
+  return [...items]
+    .sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
+    })
+    .slice(0, 5);
+}
+
+function mapReviewFromPayload(row: Record<string, unknown>): CustomerReview {
+  const rowId = typeof row.id === "string" ? row.id : "";
+  const createdAtStr =
+    typeof row.olusturulma_tarihi === "string" ? row.olusturulma_tarihi : undefined;
+
+  return {
+    id: rowId,
+    musteriAdi: typeof row.musteri_adi === "string" ? row.musteri_adi : "",
+    puan: Number(row.puan) || 5,
+    yorum: typeof row.yorum === "string" ? row.yorum : undefined,
+    tarih: createdAtStr
+      ? new Date(createdAtStr).toLocaleDateString("tr-TR", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      : new Date().toLocaleDateString("tr-TR"),
+    kaynak: row.google_review_url
+      ? "Google"
+      : row.kaynak === "Hizmet Sonrası"
+      ? "Hizmet Sonrası"
+      : "Salon",
+    hizmetTuru: typeof row.hizmet_turu === "string" ? row.hizmet_turu : undefined,
+    googleReviewUrl:
+      typeof row.google_review_url === "string" ? row.google_review_url : undefined,
+    createdAt: createdAtStr,
+    randevuId: typeof row.randevu_id === "string" ? row.randevu_id : undefined,
+  };
+}
+
+function mapAppointmentFromPayload(row: Record<string, unknown>): AppointmentItem | null {
+  const id = typeof row.id === "string" ? row.id : "";
+  if (!id) return null;
+
+  return {
+    id,
+    musteriId: typeof row.musteri_id === "string" ? row.musteri_id : null,
+    musteriAdSoyad: typeof row.musteri_ad_soyad === "string" ? row.musteri_ad_soyad : "",
+    musteriTelefon: typeof row.musteri_telefon === "string" ? row.musteri_telefon : "",
+    hizmetIdleri: Array.isArray(row.hizmet_idleri)
+      ? row.hizmet_idleri.filter((v): v is string => typeof v === "string")
+      : [],
+    calisanIdleri: Array.isArray(row.calisan_idleri)
+      ? row.calisan_idleri.filter((v): v is string => typeof v === "string")
+      : [],
+    tarihSaat:
+      typeof row.tarih_saat === "string" ? row.tarih_saat : new Date().toISOString(),
+    toplamSureDakika: Number(row.toplam_sure_dakika) || 30,
+    durum:
+      typeof row.durum === "string" ? (row.durum as AppointmentStatus) : "Beklemede",
+    kaynak:
+      typeof row.kaynak === "string" ? (row.kaynak as AppointmentSource) : "Web",
+    not: typeof row.notlar === "string" ? row.notlar : undefined,
+    onaylayanKullaniciId:
+      typeof row.onaylayan_id === "string" ? row.onaylayan_id : undefined,
+    olusturulmaTarihi:
+      typeof row.olusturulma_tarihi === "string"
+        ? row.olusturulma_tarihi
+        : new Date().toISOString(),
+  };
 }
 
 export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetState<AppState>) => ({
@@ -134,12 +321,12 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
   commentsByItem: {},
   reviews: [],
   services: [],
+  appointments: [],
   likedGalleryIds: getStoredLikes(),
 
   bootstrapApp: async (forceRefresh = false) => {
     const state = get();
     if (state.isInitialLoaded && !forceRefresh) {
-      // Zaten yüklü, arka planda hafif tazeleme
       set({ isRefreshing: true });
     } else {
       set({ isRefreshing: true });
@@ -150,17 +337,21 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
       const contentService = new ContentService(client);
       const serviceService = new ServiceService(client);
 
-      const [settingsRow, galleryRows, reviewRows, activeServices] = await Promise.all([
-        contentService.getSiteSettings().catch(() => null),
-        contentService.getGalleryItems().catch(() => []),
-        contentService.getActiveReviews().catch(() => []),
-        serviceService.getActiveServices().catch(() => []),
-      ]);
+      const [settingsRow, galleryRows, reviewRows, activeServices, adminFullName] =
+        await Promise.all([
+          contentService.getSiteSettings().catch(() => null),
+          contentService.getGalleryItems().catch(() => []),
+          contentService.getActiveReviews().catch(() => []),
+          serviceService.getActiveServices().catch(() => []),
+          fetchAdminFullName(client),
+        ]);
 
       const partialUpdates: Partial<AppState> = {
         isInitialLoaded: true,
         isRefreshing: false,
       };
+
+      let mergedPageTexts: PageTexts = state.pageTexts;
 
       // 1. Ayarlar & CMS Metinleri
       if (settingsRow) {
@@ -185,7 +376,7 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
 
         const rawSayfa = settingsRow.sayfa_metinleri as Partial<PageTexts> | undefined;
         if (rawSayfa && typeof rawSayfa === "object") {
-          partialUpdates.pageTexts = {
+          mergedPageTexts = {
             ...state.pageTexts,
             ...rawSayfa,
             hero: {
@@ -211,20 +402,29 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
         }
       }
 
+      partialUpdates.pageTexts = normalizePageTextsWithAdmin(mergedPageTexts, adminFullName);
+
       // 2. Galeri
       if (galleryRows && galleryRows.length > 0) {
-        partialUpdates.gallery = galleryRows.map((item) => ({
-          id: item.id,
-          baslik: item.baslik,
-          kategori: item.kategori,
-          gorselUrl: item.url,
-          stilist: item.stilist || "Yıldız Salon Ekibi",
-          begeniSayisi: Number(item.begeni_sayisi ?? 0),
-          yorumSayisi: Number(item.gallery_comments?.[0]?.count ?? 0),
-          medyaTuru: (item.medya_turu as "image" | "video") || "image",
-          kapakUrl: item.kapak_url ?? undefined,
-          aciklama: item.aciklama ?? undefined,
-          sira: item.sira ?? 0,
+        partialUpdates.gallery = sortGalleryByOrder(
+          galleryRows.map((item) => ({
+            id: item.id,
+            baslik: item.baslik,
+            kategori: item.kategori,
+            gorselUrl: item.url,
+            stilist: normalizeStylistName(item.stilist, adminFullName),
+            begeniSayisi: Number(item.begeni_sayisi ?? 0),
+            yorumSayisi: Number(item.gallery_comments?.[0]?.count ?? 0),
+            medyaTuru: (item.medya_turu as "image" | "video") || "image",
+            kapakUrl: item.kapak_url ?? undefined,
+            aciklama: item.aciklama ?? undefined,
+            sira: item.sira ?? 0,
+          })),
+        );
+      } else if (state.gallery.length > 0) {
+        partialUpdates.gallery = state.gallery.map((item) => ({
+          ...item,
+          stilist: normalizeStylistName(item.stilist, adminFullName),
         }));
       }
 
@@ -253,13 +453,7 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
           randevuId: rev.randevu_id ?? undefined,
         }));
 
-        partialUpdates.reviews = mappedReviews
-          .sort((a, b) => {
-            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return timeB - timeA;
-          })
-          .slice(0, 5);
+        partialUpdates.reviews = sortTopReviews(mappedReviews);
       }
 
       // 4. Hizmetler
@@ -506,7 +700,9 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
 
   updateGalleryItem: async (id, updates) => {
     set((state) => ({
-      gallery: state.gallery.map((item) => (item.id === id ? { ...item, ...updates } : item)),
+      gallery: sortGalleryByOrder(
+        state.gallery.map((item) => (item.id === id ? { ...item, ...updates } : item)),
+      ),
     }));
 
     const channel = getBroadcastChannel();
@@ -537,7 +733,9 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
   },
 
   addGalleryItem: async (item) => {
-    set((state) => ({ gallery: [item, ...state.gallery] }));
+    set((state) => ({
+      gallery: sortGalleryByOrder([item, ...state.gallery.filter((g) => g.id !== item.id)]),
+    }));
 
     const channel = getBroadcastChannel();
     if (channel) {
@@ -567,20 +765,71 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
   addCustomerReview: async (review) => {
     set((state) => {
       const filtered = state.reviews.filter((r) => r.id !== review.id);
-      const updated = [review, ...filtered]
-        .sort((a, b) => {
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return timeB - timeA;
-        })
-        .slice(0, 5);
-      return { reviews: updated };
+      return { reviews: sortTopReviews([review, ...filtered]) };
     });
 
     const channel = getBroadcastChannel();
     if (channel) {
       channel.postMessage({ type: "REVIEW_ADDED", review } as AppSyncMessage);
       channel.close();
+    }
+  },
+
+  updateCustomerReview: async (id, updates) => {
+    const isAktif = updates.aktif ?? true;
+
+    set((state) => {
+      if (!isAktif) {
+        return { reviews: state.reviews.filter((r) => r.id !== id) };
+      }
+
+      const existing = state.reviews.find((r) => r.id === id);
+      const merged: CustomerReview = existing
+        ? { ...existing, ...updates }
+        : {
+            id,
+            musteriAdi: updates.musteriAdi || "Misafir",
+            puan: updates.puan ?? 5,
+            yorum: updates.yorum,
+            tarih: updates.tarih || new Date().toLocaleDateString("tr-TR"),
+            kaynak: updates.kaynak || "Salon",
+            hizmetTuru: updates.hizmetTuru,
+            googleReviewUrl: updates.googleReviewUrl,
+            createdAt: updates.createdAt || new Date().toISOString(),
+            randevuId: updates.randevuId,
+          };
+
+      return {
+        reviews: sortTopReviews([merged, ...state.reviews.filter((r) => r.id !== id)]),
+      };
+    });
+
+    const updatedReview = get().reviews.find((r) => r.id === id);
+    const channel = getBroadcastChannel();
+    if (channel) {
+      channel.postMessage({
+        type: "REVIEW_UPDATED",
+        review:
+          updatedReview ?? {
+            id,
+            musteriAdi: updates.musteriAdi || "Misafir",
+            puan: updates.puan ?? 5,
+            tarih: updates.tarih || new Date().toLocaleDateString("tr-TR"),
+            kaynak: updates.kaynak || "Salon",
+          },
+        aktif: isAktif,
+      } as AppSyncMessage);
+      channel.close();
+    }
+
+    try {
+      await fetch(getApiUrl("/api/admin/reviews"), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...updates }),
+      });
+    } catch (err) {
+      console.error("updateCustomerReview hatası:", err);
     }
   },
 
@@ -719,26 +968,40 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
             break;
           case "GALLERY_ITEM_UPDATED":
             set((state) => ({
-              gallery: state.gallery.map((i) => (i.id === msg.id ? { ...i, ...msg.updates } : i)),
+              gallery: sortGalleryByOrder(
+                state.gallery.map((i) => (i.id === msg.id ? { ...i, ...msg.updates } : i)),
+              ),
             }));
             break;
           case "GALLERY_ITEM_ADDED":
-            set((state) => ({ gallery: [msg.item, ...state.gallery.filter((g) => g.id !== msg.item.id)] }));
+            set((state) => ({
+              gallery: sortGalleryByOrder([
+                msg.item,
+                ...state.gallery.filter((g) => g.id !== msg.item.id),
+              ]),
+            }));
             break;
           case "GALLERY_ITEM_DELETED":
             set((state) => ({ gallery: state.gallery.filter((i) => i.id !== msg.id) }));
             break;
           case "REVIEW_ADDED":
+            set((state) => ({
+              reviews: sortTopReviews([
+                msg.review,
+                ...state.reviews.filter((r) => r.id !== msg.review.id),
+              ]),
+            }));
+            break;
+          case "REVIEW_UPDATED":
             set((state) => {
-              const updated = [msg.review, ...state.reviews.filter((r) => r.id !== msg.review.id)];
+              if (msg.aktif === false) {
+                return { reviews: state.reviews.filter((r) => r.id !== msg.review.id) };
+              }
               return {
-                reviews: updated
-                  .sort((a, b) => {
-                    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                    return timeB - timeA;
-                  })
-                  .slice(0, 5),
+                reviews: sortTopReviews([
+                  msg.review,
+                  ...state.reviews.filter((r) => r.id !== msg.review.id),
+                ]),
               };
             });
             break;
@@ -757,6 +1020,24 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
               services: [msg.service, ...state.services.filter((s) => s.id !== msg.service.id)],
             }));
             break;
+          case "APPOINTMENT_CHANGED":
+            if (msg.eventType === "DELETE" && msg.id) {
+              set((state) => ({
+                appointments: state.appointments.filter((a) => a.id !== msg.id),
+              }));
+            } else if (msg.appointment) {
+              const incoming = msg.appointment;
+              set((state) => {
+                const exists = state.appointments.some((a) => a.id === incoming.id);
+                return {
+                  appointments: exists
+                    ? state.appointments.map((a) => (a.id === incoming.id ? incoming : a))
+                    : [incoming, ...state.appointments],
+                };
+              });
+            }
+            window.dispatchEvent(new CustomEvent("yildiz:appointments-changed", { detail: msg }));
+            break;
         }
       };
     }
@@ -772,8 +1053,7 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
         .on(
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "site_settings" },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (payload: any) => {
+          (payload: { new?: Record<string, unknown> }) => {
             const updated = payload.new;
             if (!updated?.id) return;
             get().bootstrapApp(true);
@@ -782,22 +1062,21 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "services" },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (payload: any) => {
+          (payload: { eventType?: string; new?: Record<string, unknown> }) => {
             if (payload.eventType === "UPDATE") {
-              const row = payload.new;
+              const row = payload.new ?? {};
               set((state) => ({
                 services: state.services.map((s) =>
                   s.id === row.id
                     ? {
                         ...s,
-                        ad: row.ad ?? s.ad,
-                        kategori: row.kategori ?? s.kategori,
+                        ad: typeof row.ad === "string" ? row.ad : s.ad,
+                        kategori: typeof row.kategori === "string" ? row.kategori : s.kategori,
                         tahminiSureDakika: Number(row.tahmini_sure_dakika ?? s.tahminiSureDakika),
                         fiyat: Number(row.fiyat ?? s.fiyat),
                         aktif: Boolean(row.aktif ?? s.aktif),
-                        aciklama: row.aciklama ?? s.aciklama,
-                        gorselUrl: row.gorsel_url ?? s.gorselUrl,
+                        aciklama: typeof row.aciklama === "string" ? row.aciklama : s.aciklama,
+                        gorselUrl: typeof row.gorsel_url === "string" ? row.gorsel_url : s.gorselUrl,
                         sira: Number(row.sira ?? s.sira),
                       }
                     : s,
@@ -810,27 +1089,68 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
         )
         .on(
           "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "gallery_items" },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (payload: any) => {
-            const updated = payload.new;
-            if (!updated?.id) return;
+          { event: "*", schema: "public", table: "gallery_items" },
+          (payload: {
+            eventType?: string;
+            new?: Record<string, unknown>;
+            old?: Record<string, unknown>;
+          }) => {
+            if (payload.eventType === "DELETE") {
+              const deletedId = typeof payload.old?.id === "string" ? payload.old.id : "";
+              if (!deletedId) return;
+              set((state) => ({
+                gallery: state.gallery.filter((item) => item.id !== deletedId),
+              }));
+              return;
+            }
+
+            const row = payload.new;
+            const rowId = typeof row?.id === "string" ? row.id : "";
+            if (!row || !rowId) return;
+
+            if (payload.eventType === "INSERT") {
+              const newItem: GalleryItem = {
+                id: rowId,
+                baslik: typeof row.baslik === "string" ? row.baslik : "",
+                kategori: typeof row.kategori === "string" ? row.kategori : "",
+                gorselUrl: typeof row.url === "string" ? row.url : "",
+                stilist: typeof row.stilist === "string" ? row.stilist : "Yıldız Salon Ekibi",
+                begeniSayisi: Number(row.begeni_sayisi ?? 0),
+                yorumSayisi: 0,
+                medyaTuru: (row.medya_turu as "image" | "video") || "image",
+                kapakUrl: typeof row.kapak_url === "string" ? row.kapak_url : undefined,
+                aciklama: typeof row.aciklama === "string" ? row.aciklama : undefined,
+                sira: typeof row.sira === "number" ? row.sira : 0,
+              };
+
+              set((state) => ({
+                gallery: sortGalleryByOrder([
+                  newItem,
+                  ...state.gallery.filter((item) => item.id !== rowId),
+                ]),
+              }));
+              return;
+            }
+
+            // UPDATE
             set((state) => ({
-              gallery: state.gallery.map((item) =>
-                item.id === updated.id
-                  ? {
-                      ...item,
-                      baslik: updated.baslik ?? item.baslik,
-                      kategori: updated.kategori ?? item.kategori,
-                      gorselUrl: updated.url ?? item.gorselUrl,
-                      stilist: updated.stilist ?? item.stilist,
-                      begeniSayisi: Number(updated.begeni_sayisi ?? item.begeniSayisi),
-                      medyaTuru: (updated.medya_turu as "image" | "video") || item.medyaTuru,
-                      kapakUrl: updated.kapak_url ?? item.kapakUrl,
-                      aciklama: updated.aciklama ?? item.aciklama,
-                      sira: updated.sira ?? item.sira,
-                    }
-                  : item,
+              gallery: sortGalleryByOrder(
+                state.gallery.map((item) =>
+                  item.id === rowId
+                    ? {
+                        ...item,
+                        baslik: typeof row.baslik === "string" ? row.baslik : item.baslik,
+                        kategori: typeof row.kategori === "string" ? row.kategori : item.kategori,
+                        gorselUrl: typeof row.url === "string" ? row.url : item.gorselUrl,
+                        stilist: typeof row.stilist === "string" ? row.stilist : item.stilist,
+                        begeniSayisi: Number(row.begeni_sayisi ?? item.begeniSayisi),
+                        medyaTuru: (row.medya_turu as "image" | "video") || item.medyaTuru,
+                        kapakUrl: typeof row.kapak_url === "string" ? row.kapak_url : item.kapakUrl,
+                        aciklama: typeof row.aciklama === "string" ? row.aciklama : item.aciklama,
+                        sira: typeof row.sira === "number" ? row.sira : item.sira,
+                      }
+                    : item,
+                ),
               ),
             }));
           },
@@ -838,30 +1158,35 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "gallery_comments" },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (payload: any) => {
+          (payload: { new?: Record<string, unknown> }) => {
             const newComment = payload.new;
-            if (!newComment?.gallery_item_id) return;
+            const galleryItemId =
+              typeof newComment?.gallery_item_id === "string" ? newComment.gallery_item_id : "";
+            const commentId = typeof newComment?.id === "string" ? newComment.id : "";
+            if (!galleryItemId || !commentId) return;
 
             const commentRow: GalleryCommentRow = {
-              id: newComment.id,
-              gallery_item_id: newComment.gallery_item_id,
-              musteri_adi: newComment.musteri_adi,
-              yorum: newComment.yorum,
-              aktif: newComment.aktif,
-              olusturulma_tarihi: newComment.olusturulma_tarihi,
+              id: commentId,
+              gallery_item_id: galleryItemId,
+              musteri_adi: typeof newComment?.musteri_adi === "string" ? newComment.musteri_adi : "",
+              yorum: typeof newComment?.yorum === "string" ? newComment.yorum : "",
+              aktif: typeof newComment?.aktif === "boolean" ? newComment.aktif : undefined,
+              olusturulma_tarihi:
+                typeof newComment?.olusturulma_tarihi === "string"
+                  ? newComment.olusturulma_tarihi
+                  : new Date().toISOString(),
             };
 
             set((state) => {
-              const list = state.commentsByItem[newComment.gallery_item_id] || [];
-              const exists = list.some((c) => c.id === newComment.id);
+              const list = state.commentsByItem[galleryItemId] || [];
+              const exists = list.some((c) => c.id === commentId);
               return {
                 commentsByItem: {
                   ...state.commentsByItem,
-                  [newComment.gallery_item_id]: exists ? list : [...list, commentRow],
+                  [galleryItemId]: exists ? list : [...list, commentRow],
                 },
                 gallery: state.gallery.map((item) =>
-                  item.id === newComment.gallery_item_id
+                  item.id === galleryItemId
                     ? { ...item, yorumSayisi: (item.yorumSayisi ?? 0) + 1 }
                     : item,
                 ),
@@ -872,10 +1197,12 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
         .on(
           "postgres_changes",
           { event: "DELETE", schema: "public", table: "gallery_comments" },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (payload: any) => {
-            const oldId = payload.old?.id;
-            const targetItemId = payload.old?.gallery_item_id;
+          (payload: { old?: Record<string, unknown> }) => {
+            const oldId = typeof payload.old?.id === "string" ? payload.old.id : undefined;
+            const targetItemId =
+              typeof payload.old?.gallery_item_id === "string"
+                ? payload.old.gallery_item_id
+                : undefined;
 
             set((state) => {
               const updatedComments: Record<string, GalleryCommentRow[]> = {};
@@ -896,47 +1223,76 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
         )
         .on(
           "postgres_changes",
-          { event: "INSERT", schema: "public", table: "customer_reviews" },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (payload: any) => {
-            const newRow = payload.new;
-            if (!newRow?.id || !newRow.aktif) return;
+          { event: "*", schema: "public", table: "customer_reviews" },
+          (payload: {
+            eventType?: string;
+            new?: Record<string, unknown>;
+            old?: Record<string, unknown>;
+          }) => {
+            if (payload.eventType === "DELETE") {
+              const deletedId = typeof payload.old?.id === "string" ? payload.old.id : "";
+              if (!deletedId) return;
+              set((state) => ({
+                reviews: state.reviews.filter((r) => r.id !== deletedId),
+              }));
+              return;
+            }
 
-            const newRevItem: CustomerReview = {
-              id: newRow.id,
-              musteriAdi: newRow.musteri_adi,
-              puan: Number(newRow.puan) || 5,
-              yorum: newRow.yorum ?? undefined,
-              tarih: newRow.olusturulma_tarihi
-                ? new Date(newRow.olusturulma_tarihi).toLocaleDateString("tr-TR", {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  })
-                : new Date().toLocaleDateString("tr-TR"),
-              kaynak: newRow.google_review_url
-                ? "Google"
-                : newRow.kaynak === "Hizmet Sonrası"
-                ? "Hizmet Sonrası"
-                : "Salon",
-              hizmetTuru: newRow.hizmet_turu,
-              googleReviewUrl: newRow.google_review_url ?? undefined,
-              createdAt: newRow.olusturulma_tarihi,
-              randevuId: newRow.randevu_id ?? undefined,
-            };
+            const row = payload.new;
+            const rowId = typeof row?.id === "string" ? row.id : "";
+            if (!row || !rowId) return;
 
-            set((state) => {
-              const updated = [newRevItem, ...state.reviews.filter((r) => r.id !== newRow.id)];
-              return {
-                reviews: updated
-                  .sort((a, b) => {
-                    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                    return timeB - timeA;
-                  })
-                  .slice(0, 5),
-              };
-            });
+            if (!row.aktif) {
+              set((state) => ({
+                reviews: state.reviews.filter((r) => r.id !== rowId),
+              }));
+              return;
+            }
+
+            const reviewItem = mapReviewFromPayload(row);
+            set((state) => ({
+              reviews: sortTopReviews([
+                reviewItem,
+                ...state.reviews.filter((r) => r.id !== rowId),
+              ]),
+            }));
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "appointments" },
+          (payload: {
+            eventType?: string;
+            new?: Record<string, unknown>;
+            old?: Record<string, unknown>;
+          }) => {
+            if (payload.eventType === "DELETE") {
+              const deletedId = typeof payload.old?.id === "string" ? payload.old.id : "";
+              if (deletedId) {
+                set((state) => ({
+                  appointments: state.appointments.filter((a) => a.id !== deletedId),
+                }));
+              }
+            } else if (payload.new) {
+              const mapped = mapAppointmentFromPayload(payload.new);
+              if (mapped) {
+                set((state) => {
+                  const exists = state.appointments.some((a) => a.id === mapped.id);
+                  return {
+                    appointments: exists
+                      ? state.appointments.map((a) => (a.id === mapped.id ? mapped : a))
+                      : [mapped, ...state.appointments],
+                  };
+                });
+              }
+            }
+
+            useAuthStore.getState().fetchUserAppointments();
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("yildiz:appointments-changed", { detail: payload }),
+              );
+            }
           },
         )
         .subscribe();

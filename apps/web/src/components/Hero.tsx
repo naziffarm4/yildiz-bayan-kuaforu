@@ -168,7 +168,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
                   {heroMedia?.baslik || "Zarif Dalgalar & Sıcak Bal Yansımaları"}
                 </span>
                 <span className="text-xs text-gray-200 mt-1 font-light">
-                  {heroMedia?.altBaslik || "Yıldız Aksoy Salon Koleksiyonu"}
+                  {heroMedia?.altBaslik || "Yıldız Bayan Kuaförü Özel Koleksiyonu"}
                 </span>
               </div>
             </div>

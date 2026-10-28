@@ -234,8 +234,8 @@ export const CashRegisterPOS: React.FC<CashRegisterPOSProps> = ({
         setCopyFeedback(true);
         setTimeout(() => setCopyFeedback(false), 3000);
       }
-    } catch {
-      // Pano hatası yok sayılır
+    } catch (err: unknown) {
+      console.warn("Panoya kopyalama başarısız:", err);
     }
   };
 

@@ -51,7 +51,7 @@ export default function AboutPage() {
               <div className="relative h-[480px] w-full rounded-2xl overflow-hidden border border-border shadow-xl">
                 <Image
                   src="https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&fit=crop&w=1000&q=80"
-                  alt="Yıldız Aksoy Salon Atmosferi"
+                  alt="Yıldız Bayan Kuaförü Salon Atmosferi"
                   fill
                   loading="lazy"
                   sizes="(max-width: 1024px) 100vw, 40vw"

@@ -214,7 +214,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             type="button"
             onClick={() => onToggleRole(userRole === "Admin" ? "Calisan" : "Admin")}
             className="focus:outline-none shrink-0"
-            title="Tıklayarak rol simülasyonunu değiştir (Admin / Çalışan)"
+            title="Aktif görünüm rolünü değiştir"
           >
             <Badge
               variant={userRole === "Admin" ? "gold" : "pink"}

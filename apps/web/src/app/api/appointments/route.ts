@@ -1,51 +1,111 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizePhoneNumber } from "@/lib/phone-utils";
 import { generateSafeUUID } from "@yildiz/types";
 
+const RawAppointmentBodySchema = z
+  .object({
+    musteri_ad_soyad: z.string().optional(),
+    musteriAdSoyad: z.string().optional(),
+    musteri_telefon: z.string().optional(),
+    musteriTelefon: z.string().optional(),
+    hizmet_idleri: z.array(z.string().trim().min(1)).optional(),
+    hizmetIdleri: z.array(z.string().trim().min(1)).optional(),
+    tarih_saat: z.string().optional(),
+    tarihSaat: z.string().optional(),
+    toplam_sure_dakika: z.union([z.number(), z.string()]).optional(),
+    toplamSureDakika: z.union([z.number(), z.string()]).optional(),
+    notlar: z.string().nullable().optional(),
+    not: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+const NormalizedAppointmentSchema = z.object({
+  musteriAdSoyad: z.string().trim().min(1, "Müşteri adı ve soyadı zorunludur."),
+  musteriTelefon: z
+    .string()
+    .trim()
+    .min(1, "Müşteri telefon numarası zorunludur.")
+    .regex(
+      /^[0-9+\s()-]+$/,
+      "Geçersiz telefon numarası formatı."
+    )
+    .refine(
+      (val) => val.replace(/\D/g, "").length >= 10 && val.replace(/\D/g, "").length <= 15,
+      "Geçerli bir telefon numarası giriniz."
+    ),
+  hizmetIdleri: z
+    .array(z.string().trim().min(1))
+    .min(1, "En az bir hizmet seçilmelidir."),
+  tarihSaat: z.string().trim().min(1, "Randevu tarihi ve saati seçilmelidir."),
+  toplamSureDakika: z.number().int().positive().default(30),
+  notlar: z.string().nullable(),
+});
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const musteriAdSoyad = (body.musteri_ad_soyad || body.musteriAdSoyad || "").trim();
-    const musteriTelefon = (body.musteri_telefon || body.musteriTelefon || "").trim();
-    const hizmetIdleri = body.hizmet_idleri || body.hizmetIdleri;
-    const tarihSaat = body.tarih_saat || body.tarihSaat;
-    const toplamSureDakika = Number(body.toplam_sure_dakika || body.toplamSureDakika) || 30;
-    const notlar = (body.notlar || body.not || "").trim() || null;
+    const rawJson: unknown = await request.json().catch(() => ({}));
+    const rawParsed = RawAppointmentBodySchema.safeParse(rawJson);
 
-    if (!musteriAdSoyad) {
+    if (!rawParsed.success) {
       return NextResponse.json(
-        { success: false, error: "Müşteri adı ve soyadı zorunludur." },
+        {
+          success: false,
+          error: rawParsed.error.issues[0]?.message || "Geçersiz randevu verisi.",
+        },
         { status: 400 }
       );
     }
 
-    if (!musteriTelefon) {
+    const body = rawParsed.data;
+    const rawDuration = Number(body.toplam_sure_dakika ?? body.toplamSureDakika);
+    const normalizedInput = {
+      musteriAdSoyad: (body.musteri_ad_soyad ?? body.musteriAdSoyad ?? "").trim(),
+      musteriTelefon: (body.musteri_telefon ?? body.musteriTelefon ?? "").trim(),
+      hizmetIdleri: Array.isArray(body.hizmet_idleri)
+        ? body.hizmet_idleri
+        : Array.isArray(body.hizmetIdleri)
+          ? body.hizmetIdleri
+          : [],
+      tarihSaat: (body.tarih_saat ?? body.tarihSaat ?? "").trim(),
+      toplamSureDakika: Number.isFinite(rawDuration) && rawDuration > 0 ? Math.trunc(rawDuration) : 30,
+      notlar: (body.notlar ?? body.not ?? "")?.trim() || null,
+    };
+
+    const validated = NormalizedAppointmentSchema.safeParse(normalizedInput);
+    if (!validated.success) {
       return NextResponse.json(
-        { success: false, error: "Müşteri telefon numarası zorunludur." },
+        {
+          success: false,
+          error: validated.error.issues[0]?.message || "Geçersiz randevu bilgileri.",
+        },
         { status: 400 }
       );
     }
 
-    if (!Array.isArray(hizmetIdleri) || hizmetIdleri.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "En az bir hizmet seçilmelidir." },
-        { status: 400 }
-      );
-    }
-
-    if (!tarihSaat) {
-      return NextResponse.json(
-        { success: false, error: "Randevu tarihi ve saati seçilmelidir." },
-        { status: 400 }
-      );
-    }
+    const {
+      musteriAdSoyad,
+      musteriTelefon,
+      hizmetIdleri,
+      tarihSaat,
+      toplamSureDakika,
+      notlar,
+    } = validated.data;
 
     const formattedPhone = normalizePhoneNumber(musteriTelefon);
     const cleanDigits = musteriTelefon.replace(/\D/g, "");
+    const validPhoneCandidates = Array.from(
+      new Set(
+        [formattedPhone, cleanDigits, musteriTelefon].filter(
+          (candidate): candidate is string =>
+            Boolean(candidate && /^[0-9+\s()-]{10,20}$/.test(candidate))
+        )
+      )
+    );
 
     const supabaseAdmin = getSupabaseAdmin();
     if (!supabaseAdmin) {
@@ -67,16 +127,16 @@ export async function POST(request: Request) {
       if (user?.id) {
         musteriId = user.id;
       }
-    } catch {
-      // Oturum yok, misafir akışına devam edilir
+    } catch (authErr: unknown) {
+      console.warn("Oturum bilgisi okunamadı, misafir akışına devam ediliyor:", authErr);
     }
 
     // 2. Oturum yoksa: profiles tablosunda telefon ile kayıtlı profil ara
-    if (!musteriId) {
+    if (!musteriId && validPhoneCandidates.length > 0) {
       const { data: existingProfile } = await supabaseAdmin
         .from("profiles")
         .select("id, ad, soyad")
-        .or(`telefon.eq.${formattedPhone},telefon.eq.${cleanDigits},telefon.eq.${musteriTelefon}`)
+        .in("telefon", validPhoneCandidates)
         .limit(1)
         .maybeSingle();
 
@@ -98,10 +158,10 @@ export async function POST(request: Request) {
           id: newProfileId,
           ad,
           soyad,
-          telefon: formattedPhone || musteriTelefon,
+          telefon: formattedPhone || cleanDigits,
           rol: "Musteri",
           toplam_puan: 0,
-          sms_dogrulandi: true,
+          sms_dogrulandi: false,
         })
         .select("id")
         .single();
@@ -125,7 +185,7 @@ export async function POST(request: Request) {
         id: appointmentId,
         musteri_id: musteriId || null,
         musteri_ad_soyad: musteriAdSoyad,
-        musteri_telefon: formattedPhone || musteriTelefon,
+        musteri_telefon: formattedPhone || cleanDigits,
         hizmet_idleri: hizmetIdleri,
         calisan_idleri: [],
         tarih_saat: tarihSaat,

@@ -133,8 +133,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ appointments: mapped });
         return;
       }
-    } catch {
-      // Hata durumunda sessizce mevcut durumu koru veya boş bırak
+    } catch (err: unknown) {
+      console.warn("Kullanıcı randevuları alınırken uyarı:", err);
     }
 
     set({ appointments: [] });
@@ -234,8 +234,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-    } catch {
-      // signOut hatası güvenle yutulur
+    } catch (err: unknown) {
+      console.warn("Oturum kapatılırken uyarı:", err);
     }
     set({ user: null, appointments: [], isLoading: false, isGoogleUser: false });
   },

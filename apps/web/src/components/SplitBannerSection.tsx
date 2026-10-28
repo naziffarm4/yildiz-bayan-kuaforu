@@ -4,6 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@yildiz/ui";
+import { useAppStore } from "@/stores/app-store";
 
 interface SplitBannerSectionProps {
   onOpenBooking: () => void;
@@ -12,6 +13,8 @@ interface SplitBannerSectionProps {
 export const SplitBannerSection: React.FC<SplitBannerSectionProps> = ({
   onOpenBooking,
 }) => {
+  const about = useAppStore((s) => s.pageTexts.about);
+
   return (
     <section className="py-0 border-b border-border-main overflow-hidden">
       {/* 1. BLOK: BEYAZ & DİKEY GÖRSEL SPLIT DÜZENİ */}
@@ -128,12 +131,12 @@ export const SplitBannerSection: React.FC<SplitBannerSectionProps> = ({
           </span>
 
           <blockquote className="font-serif text-xl sm:text-2xl lg:text-3xl font-normal italic text-white max-w-3xl mx-auto leading-relaxed drop-shadow-xs">
-            &ldquo;Güzellik, aceleye getirilmeyecek kadar kutsal bir sanattır. Her kadın kendi ışığını yansıtan bir saç tasarımını hak eder.&rdquo;
+            &ldquo;{about?.quote || "Güzellik, aceleye getirilmeyecek kadar kutsal bir sanattır."}&rdquo;
           </blockquote>
 
           <div className="pt-1">
             <span className="text-xs uppercase tracking-[0.25em] text-white font-extrabold block">
-              Yıldız Aksoy — Kurucu & Master Stilist
+              {about?.founder || "Yıldız Bayan Kuaförü — Kurucu & Master Stilist"}
             </span>
             <span className="text-[11px] text-white/85 mt-1 block font-medium">
               Bağdat Caddesi Butik Salon

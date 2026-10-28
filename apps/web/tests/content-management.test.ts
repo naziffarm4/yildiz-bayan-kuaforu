@@ -35,7 +35,7 @@ describe("CMS & İçerik Yönetim Sistemi (Content Management System)", () => {
       expect(DEFAULT_PAGE_TEXTS.heroMedia.rozet).toBe("Haute Coiffure 2026");
       expect(DEFAULT_PAGE_TEXTS.heroFeatures).toHaveLength(3);
       expect(DEFAULT_PAGE_TEXTS.heroFeatures[0]?.baslik).toBe("01. Tampon Süreli Seans");
-      expect(DEFAULT_PAGE_TEXTS.artist.adSoyad).toBe("Yıldız Aksoy");
+      expect(DEFAULT_PAGE_TEXTS.artist.adSoyad).toBe("Yıldız Bayan Kuaförü");
       expect(DEFAULT_PAGE_TEXTS.artist.etiket).toBe("Haute Coiffure Sanatçısı");
       expect(DEFAULT_PAGE_TEXTS.artist.vipOzellikler).toHaveLength(3);
       expect(DEFAULT_PAGE_TEXTS.servicesSection.baslik).toBe("Ustalıkla Sunulan Hizmetlerimiz");

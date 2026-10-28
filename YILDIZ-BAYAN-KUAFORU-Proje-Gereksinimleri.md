@@ -273,6 +273,7 @@ Proje genelinde referans alınan BeautyZone lüks kuaför salonu tasarım şablo
 | **Secondary Hover**        | Koyu Turkuaz                      | `#00a9b8`  | `--color-secondary-hover` |
 | **Koyu Başlık & Hero**     | Lüks Derin Mürdüm / Bordo         | `#320016`  | `--color-dark`            |
 | **TopBar Arka Planı**      | Canlı Salon Pembesi               | `#ff5ea5`  | `--color-bg-topbar`       |
+| **Menü Header Arka Planı** | Saf Beyaz                         | `#FFFFFF`  | `--color-bg-header`       |
 | **Ana Arka Plan**          | Saf Beyaz                         | `#FFFFFF`  | `--color-bg-primary`      |
 | **İkincil Arka Plan**      | Lüks Açık Gri / Bej               | `#F8F9FA`  | `--color-bg-secondary`    |
 | **Lüks Aksan**             | Soft Altın                        | `#C9A96E`  | `--color-gold`            |

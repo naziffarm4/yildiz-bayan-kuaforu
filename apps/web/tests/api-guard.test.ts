@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { withStaffOrAdminAuth } from "@/lib/auth/api-guard";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 
 const mockGetUser = vi.fn();
@@ -93,5 +94,23 @@ describe("API Guard: withStaffOrAdminAuth", () => {
     const json = await res.json();
     expect(json.admin).toBe(true);
     expect(handler).toHaveBeenCalled();
+  });
+
+  it("getSupabaseAdmin SUPABASE_SERVICE_ROLE_KEY yoksa NEXT_PUBLIC_SUPABASE_ANON_KEY'e düşmez ve null döner (S10)", () => {
+    const origUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const origAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const origService = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://mock.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "mock-anon-key";
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    expect(getSupabaseAdmin()).toBeNull();
+
+    if (origUrl) process.env.NEXT_PUBLIC_SUPABASE_URL = origUrl;
+    else delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (origAnon) process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = origAnon;
+    else delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (origService) process.env.SUPABASE_SERVICE_ROLE_KEY = origService;
   });
 });

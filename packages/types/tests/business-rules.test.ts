@@ -5,12 +5,15 @@ import {
   calculateLoyaltyDiscount,
   calculateCommission,
   calculateAppointmentTotalDuration,
+  calculateElapsedWorkingMinutes,
+  isPendingAppointmentExpired,
   generateSafeUUID,
   formatFacebookUrl,
   AppointmentStatusSchema,
   UserRoleSchema,
   CustomerReviewSchema,
   BookingWizardFormSchema,
+  type SpecialDay,
 } from "../src/index";
 
 describe("İş Kuralları - Paket İadesi", () => {
@@ -134,3 +137,110 @@ describe("Zod Şemaları Doğrulama", () => {
     });
   });
 });
+
+describe("İş Kuralları - Bekleyen Randevu 30 Dk Çalışma Saatleri Süre Dolumu (Madde 4 & 15)", () => {
+  const defaultWorkingHours = {
+    haftaIci: "09:00 - 20:00",
+    cumartesi: "09:00 - 20:30",
+    pazar: "Kapalı",
+  };
+
+  it("çalışma saatleri içinde geçen süreyi dakika olarak doğru hesaplar", () => {
+    // Çarşamba 10:00 -> 10:35 (35 dakika çalışma süresi)
+    const elapsed = calculateElapsedWorkingMinutes(
+      "2026-10-28T10:00:00+03:00",
+      "2026-10-28T10:35:00+03:00",
+      defaultWorkingHours,
+    );
+    expect(elapsed).toBe(35);
+    expect(
+      isPendingAppointmentExpired(
+        "2026-10-28T10:00:00+03:00",
+        "2026-10-28T10:35:00+03:00",
+        30,
+        defaultWorkingHours,
+      ),
+    ).toBe(true);
+  });
+
+  it("çalışma saatleri dışında (gece / kapalı saatlerde) süreyi işletmez", () => {
+    // Çarşamba 21:00'da alındı, Perşembe 09:20'de kontrol edildi -> Sadece 09:00-09:20 arası 20 dk işler (30 dk dolmadı)
+    const elapsed = calculateElapsedWorkingMinutes(
+      "2026-10-28T21:00:00+03:00",
+      "2026-10-29T09:20:00+03:00",
+      defaultWorkingHours,
+    );
+    expect(elapsed).toBe(20);
+    expect(
+      isPendingAppointmentExpired(
+        "2026-10-28T21:00:00+03:00",
+        "2026-10-29T09:20:00+03:00",
+        30,
+        defaultWorkingHours,
+      ),
+    ).toBe(false);
+
+    // Kapanışa 10 dk kala (19:50) alındı, ertesi sabah 09:25'te kontrol edildi -> 10 + 25 = 35 dk (süresi doldu)
+    const elapsedAcrossNight = calculateElapsedWorkingMinutes(
+      "2026-10-28T19:50:00+03:00",
+      "2026-10-29T09:25:00+03:00",
+      defaultWorkingHours,
+    );
+    expect(elapsedAcrossNight).toBe(35);
+    expect(
+      isPendingAppointmentExpired(
+        "2026-10-28T19:50:00+03:00",
+        "2026-10-29T09:25:00+03:00",
+        30,
+        defaultWorkingHours,
+      ),
+    ).toBe(true);
+  });
+
+  it("kapalı günde (Pazar) süreyi işletmez, Pazartesi açılışından itibaren sayar", () => {
+    // 2026-10-25 Pazar 14:00 -> 2026-10-26 Pazartesi 09:15 (15 dk)
+    const elapsed = calculateElapsedWorkingMinutes(
+      "2026-10-25T14:00:00+03:00",
+      "2026-10-26T09:15:00+03:00",
+      defaultWorkingHours,
+    );
+    expect(elapsed).toBe(15);
+  });
+
+  it("özel günleri (SpecialDay) her zaman standart çalışma saatlerine göre öncelikli uygular", () => {
+    const specialDays: SpecialDay[] = [
+      {
+        id: "f9010000-0000-4000-8000-000000000001",
+        tarih: "2026-10-29",
+        aciklama: "Cumhuriyet Bayramı Resmi Tatili",
+        kapali: true,
+      },
+      {
+        id: "f9010000-0000-4000-8000-000000000002",
+        tarih: "2026-12-31",
+        aciklama: "Yılbaşı Özel Seansları",
+        kapali: false,
+        ozelSaatler: "10:00 - 14:00",
+      },
+    ];
+
+    // 29 Ekim Perşembe resmi tatil (kapalı): Çarşamba 19:45'te alınan randevu Cuma 09:10'a kadar 15 + 10 = 25 dk işler
+    const elapsedWithHoliday = calculateElapsedWorkingMinutes(
+      "2026-10-28T19:45:00+03:00",
+      "2026-10-30T09:10:00+03:00",
+      defaultWorkingHours,
+      specialDays,
+    );
+    expect(elapsedWithHoliday).toBe(25);
+
+    // 31 Aralık özel saatler (10:00 - 14:00): 09:00 - 10:20 arasında sadece 20 dk işler
+    const elapsedSpecialOpen = calculateElapsedWorkingMinutes(
+      "2026-12-31T09:00:00+03:00",
+      "2026-12-31T10:20:00+03:00",
+      defaultWorkingHours,
+      specialDays,
+    );
+    expect(elapsedSpecialOpen).toBe(20);
+  });
+});
+

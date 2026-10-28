@@ -116,7 +116,7 @@ export const AdminTopbar: React.FC<AdminTopbarProps> = ({
             type="button"
             onClick={() => onToggleRole(userRole === "Admin" ? "Calisan" : "Admin")}
             className="focus:outline-none"
-            title="Tıklayarak rol simülasyonunu değiştir (Admin / Çalışan)"
+            title="Aktif görünüm rolünü değiştir"
           >
             <Badge variant={userRole === "Admin" ? "gold" : "pink"} className="cursor-pointer text-[10px] sm:text-xs px-2 py-0.5">
               {userRole === "Admin" ? "👑 Admin" : "✂️ Çalışan"}

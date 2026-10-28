@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import type {
   AppointmentItem,
   CashPayment,
@@ -12,24 +13,51 @@ import type {
   GalleryItem,
 } from "@yildiz/types";
 import { generateSafeUUID } from "@yildiz/types";
-import {
-  AdminDashboard,
-  AppointmentManager,
-  CashRegisterPOS,
-  StaffCommissionManager,
-  ServiceManager,
-  StockManager,
-  SupplierManager,
-  GalleryManager,
-  ReviewsManager,
-  SiteSettingsManager,
-} from "@yildiz/ui";
+import { AdminDashboard } from "@yildiz/ui";
 import { AdminTopbar, type AdminTab } from "@/components/admin/AdminTopbar";
 import { AdminDrawer } from "@/components/admin/AdminDrawer";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminFixedFooter } from "@/components/admin/AdminFixedFooter";
 import { PageLoader } from "@/components/PageLoader";
+
+const AppointmentManager = dynamic(
+  () => import("@yildiz/ui").then((m) => m.AppointmentManager),
+  { loading: () => <PageLoader /> },
+);
+const CashRegisterPOS = dynamic(
+  () => import("@yildiz/ui").then((m) => m.CashRegisterPOS),
+  { loading: () => <PageLoader /> },
+);
+const StaffCommissionManager = dynamic(
+  () => import("@yildiz/ui").then((m) => m.StaffCommissionManager),
+  { loading: () => <PageLoader /> },
+);
+const ServiceManager = dynamic(
+  () => import("@yildiz/ui").then((m) => m.ServiceManager),
+  { loading: () => <PageLoader /> },
+);
+const StockManager = dynamic(
+  () => import("@yildiz/ui").then((m) => m.StockManager),
+  { loading: () => <PageLoader /> },
+);
+const SupplierManager = dynamic(
+  () => import("@yildiz/ui").then((m) => m.SupplierManager),
+  { loading: () => <PageLoader /> },
+);
+const GalleryManager = dynamic(
+  () => import("@yildiz/ui").then((m) => m.GalleryManager),
+  { loading: () => <PageLoader /> },
+);
+const ReviewsManager = dynamic(
+  () => import("@yildiz/ui").then((m) => m.ReviewsManager),
+  { loading: () => <PageLoader /> },
+);
+const SiteSettingsManager = dynamic(
+  () => import("@yildiz/ui").then((m) => m.SiteSettingsManager),
+  { loading: () => <PageLoader /> },
+);
 import { useContent } from "@/lib/content-context";
+import { useAuth } from "@/lib/auth-context";
 import { useAppStore } from "@/stores/app-store";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -47,6 +75,7 @@ import {
 } from "@/services";
 
 export default function AdminPage() {
+  const { user } = useAuth();
   const [currentTab, setCurrentTab] = useState<AdminTab>("dashboard");
   const [userRole, setUserRole] = useState<"Admin" | "Calisan">("Admin");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -91,8 +120,11 @@ export default function AdminPage() {
   const [selectedAppointmentForPOS, setSelectedAppointmentForPOS] = useState<AppointmentItem | null>(null);
 
   // Aktif kullanıcı adı
+  const authFullName = user ? `${user.ad} ${user.soyad}`.trim() : "";
   const activeStaffMember = staff.find((s) => (userRole === "Admin" ? s.rol === "Admin" : s.rol === "Calisan")) ?? staff[0];
-  const activeStaffName = activeStaffMember ? `${activeStaffMember.ad} ${activeStaffMember.soyad}` : "Admin Kullanıcı";
+  const activeStaffName =
+    authFullName ||
+    (activeStaffMember ? `${activeStaffMember.ad} ${activeStaffMember.soyad}`.trim() : "Yıldız Bayan Kuaförü");
 
   // Sayıcılar
   const pendingCount = appointments.filter((a) => a.durum === "Beklemede").length;
@@ -256,8 +288,8 @@ export default function AdminPage() {
           }));
           setStaff(mappedStaff);
         }
-      } catch {
-        // Fallback state korunur
+      } catch (err: unknown) {
+        console.warn("Admin verileri yüklenirken uyarı, yerel durum korunuyor:", err);
       } finally {
         if (isMounted) {
           setIsAdminLoading(false);
@@ -267,8 +299,91 @@ export default function AdminPage() {
 
     loadLiveAdminData();
 
+    const handleAppointmentsRealtimeChange = (event: Event) => {
+      if (!isMounted) return;
+      const customEvent = event as CustomEvent<{
+        eventType?: string;
+        new?: Record<string, unknown>;
+        old?: Record<string, unknown>;
+        appointment?: AppointmentItem;
+        id?: string;
+      }>;
+      const detail = customEvent.detail;
+
+      if (detail?.eventType === "DELETE") {
+        const deletedId =
+          typeof detail.old?.id === "string"
+            ? detail.old.id
+            : typeof detail.id === "string"
+            ? detail.id
+            : "";
+        if (deletedId) {
+          setAppointments((prev) => prev.filter((a) => a.id !== deletedId));
+          return;
+        }
+      }
+
+      if (detail?.appointment) {
+        const incoming = detail.appointment;
+        setAppointments((prev) => {
+          const exists = prev.some((a) => a.id === incoming.id);
+          return exists
+            ? prev.map((a) => (a.id === incoming.id ? incoming : a))
+            : [incoming, ...prev];
+        });
+        return;
+      }
+
+      if (detail?.new && typeof detail.new.id === "string") {
+        const row = detail.new;
+        const mapped: AppointmentItem = {
+          id: row.id as string,
+          musteriId: typeof row.musteri_id === "string" ? row.musteri_id : null,
+          musteriAdSoyad: typeof row.musteri_ad_soyad === "string" ? row.musteri_ad_soyad : "",
+          musteriTelefon: typeof row.musteri_telefon === "string" ? row.musteri_telefon : "",
+          hizmetIdleri: Array.isArray(row.hizmet_idleri)
+            ? row.hizmet_idleri.filter((v): v is string => typeof v === "string")
+            : [],
+          calisanIdleri: Array.isArray(row.calisan_idleri)
+            ? row.calisan_idleri.filter((v): v is string => typeof v === "string")
+            : [],
+          tarihSaat:
+            typeof row.tarih_saat === "string" ? row.tarih_saat : new Date().toISOString(),
+          toplamSureDakika: Number(row.toplam_sure_dakika) || 30,
+          durum:
+            typeof row.durum === "string"
+              ? (row.durum as AppointmentItem["durum"])
+              : "Beklemede",
+          kaynak:
+            typeof row.kaynak === "string"
+              ? (row.kaynak as AppointmentItem["kaynak"])
+              : "Web",
+          not: typeof row.notlar === "string" ? row.notlar : undefined,
+          onaylayanKullaniciId:
+            typeof row.onaylayan_id === "string" ? row.onaylayan_id : undefined,
+          olusturulmaTarihi:
+            typeof row.olusturulma_tarihi === "string"
+              ? row.olusturulma_tarihi
+              : new Date().toISOString(),
+        };
+
+        setAppointments((prev) => {
+          const exists = prev.some((a) => a.id === mapped.id);
+          return exists
+            ? prev.map((a) => (a.id === mapped.id ? mapped : a))
+            : [mapped, ...prev];
+        });
+        return;
+      }
+
+      loadLiveAdminData();
+    };
+
+    window.addEventListener("yildiz:appointments-changed", handleAppointmentsRealtimeChange);
+
     return () => {
       isMounted = false;
+      window.removeEventListener("yildiz:appointments-changed", handleAppointmentsRealtimeChange);
     };
   }, []);
 
@@ -330,9 +445,11 @@ export default function AdminPage() {
           kaynak: created.kaynak,
           notlar: created.not ?? null,
         })
-        .catch(() => {});
-    } catch {
-      // Hata durumunda yerel durum korunur
+        .catch((err: unknown) => {
+          console.warn("Randevu veritabanına kaydedilemedi:", err);
+        });
+    } catch (err: unknown) {
+      console.warn("Randevu oluşturma servisi başlatılamadı:", err);
     }
   };
 
@@ -373,15 +490,19 @@ export default function AdminPage() {
           },
           Math.floor(payment.odenenTutar * 0.1),
         )
-        .catch(() => {});
+        .catch((err: unknown) => {
+          console.warn("Ödeme veritabanına kaydedilemedi:", err);
+        });
 
       if (appointmentId) {
         appointmentService
           .updateAppointmentStatus(appointmentId, "Tamamlandı", activeStaffMember?.id)
-          .catch(() => {});
+          .catch((err: unknown) => {
+            console.warn("Randevu durumu tamamlandı olarak güncellenemedi:", err);
+          });
       }
-    } catch {
-      // Hata durumunda yerel durum korunur
+    } catch (err: unknown) {
+      console.warn("Ödeme servisi başlatılamadı:", err);
     }
   };
 
@@ -611,6 +732,7 @@ export default function AdminPage() {
   };
 
   const handleAddPhoto = async (photo: Omit<GalleryItem, "id" | "begeniSayisi">) => {
+    const resolvedStylist = photo.stilist?.trim() || activeStaffName || "Yıldız Bayan Kuaförü";
     let savedId = generateSafeUUID();
     try {
       const res = await fetch("/api/admin/gallery", {
@@ -624,7 +746,7 @@ export default function AdminPage() {
           medya_turu: photo.medyaTuru ?? "image",
           kapak_url: photo.kapakUrl ?? null,
           aciklama: photo.aciklama ?? null,
-          stilist: photo.stilist ?? "Yıldız Aksoy",
+          stilist: resolvedStylist,
         }),
       });
       if (res.ok) {
@@ -641,7 +763,7 @@ export default function AdminPage() {
       ...photo,
       id: savedId,
       begeniSayisi: 0,
-      stilist: photo.stilist || "Yıldız Aksoy",
+      stilist: resolvedStylist,
       medyaTuru: photo.medyaTuru || "image",
     } as GalleryItem;
 

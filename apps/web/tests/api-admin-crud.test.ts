@@ -1,21 +1,58 @@
-import { describe, it, expect, vi } from "vitest";
-import { CustomerReviewSchema, generateSafeUUID } from "@yildiz/types";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { CustomerReviewSchema, GalleryCommentSchema, generateSafeUUID } from "@yildiz/types";
+import type { RouteHandler } from "../src/lib/auth/api-guard";
 
-vi.mock("@/lib/auth/api-guard", () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  withStaffOrAdminAuth: (handler: any) => handler,
+const { mockAuthGetUser, mockStorageUpload, mockStorageGetPublicUrl } = vi.hoisted(() => ({
+  mockAuthGetUser: vi.fn().mockResolvedValue({
+    data: { user: { id: "auth-user-123" } },
+    error: null,
+  }),
+  mockStorageUpload: vi.fn().mockResolvedValue({ error: { message: "Storage mock error" } }),
+  mockStorageGetPublicUrl: vi.fn().mockReturnValue({
+    data: {
+      publicUrl:
+        "https://mock.supabase.co/storage/v1/object/public/salon-media/gallery/test.png",
+    },
+  }),
 }));
 
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(() => ({
+    auth: {
+      getUser: mockAuthGetUser,
+    },
+  })),
+}));
+
+vi.mock("@/lib/auth/api-guard", () => ({
+  withStaffOrAdminAuth: (handler: RouteHandler) => handler,
+}));
+
+interface MockQueryChain extends Promise<{ data: Array<{ id: string; begeni_sayisi: number }>; error: null }> {
+  order: ReturnType<typeof vi.fn>;
+  eq: ReturnType<typeof vi.fn>;
+  maybeSingle: ReturnType<typeof vi.fn>;
+  single: ReturnType<typeof vi.fn>;
+  select: ReturnType<typeof vi.fn>;
+}
+
 vi.mock("@/lib/supabase/admin", () => {
-  const createChain = () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p: any = Promise.resolve({ data: [{ id: "mock-uuid", begeni_sayisi: 5 }], error: null });
-    p.order = vi.fn().mockImplementation(createChain);
-    p.eq = vi.fn().mockImplementation(createChain);
-    p.maybeSingle = vi.fn().mockResolvedValue({ data: { id: "mock-uuid", begeni_sayisi: 5 }, error: null });
-    p.single = vi.fn().mockResolvedValue({ data: { id: "mock-uuid", begeni_sayisi: 5 }, error: null });
-    p.select = vi.fn().mockImplementation(createChain);
-    return p;
+  const createChain = (): MockQueryChain => {
+    const basePromise = Promise.resolve({
+      data: [{ id: "mock-uuid", begeni_sayisi: 5 }],
+      error: null,
+    });
+    const chain = Object.assign(basePromise, {
+      order: vi.fn(),
+      eq: vi.fn(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: "mock-uuid", begeni_sayisi: 5 }, error: null }),
+      single: vi.fn().mockResolvedValue({ data: { id: "mock-uuid", begeni_sayisi: 5 }, error: null }),
+      select: vi.fn(),
+    });
+    chain.order.mockImplementation(createChain);
+    chain.eq.mockImplementation(createChain);
+    chain.select.mockImplementation(createChain);
+    return chain;
   };
 
   return {
@@ -38,6 +75,12 @@ vi.mock("@/lib/supabase/admin", () => {
           }),
         }),
       }),
+      storage: {
+        from: vi.fn().mockReturnValue({
+          upload: mockStorageUpload,
+          getPublicUrl: mockStorageGetPublicUrl,
+        }),
+      },
     }),
   };
 });
@@ -52,7 +95,7 @@ import { GET as AdminGalleryCommentsGET, DELETE as AdminGalleryCommentsDELETE } 
 import { POST as GalleryLikePOST } from "../src/app/api/gallery/like/route";
 import { GET as GalleryCommentsGET, POST as GalleryCommentsPOST } from "../src/app/api/gallery/comments/route";
 import { POST as PublicReviewPOST } from "../src/app/api/reviews/route";
-import { GalleryCommentSchema } from "@yildiz/types";
+import { POST as AdminUploadPOST } from "../src/app/api/admin/upload/route";
 
 describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () => {
   describe("Google Metinsiz Puanlama (CustomerReviewSchema)", () => {
@@ -374,7 +417,7 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
           kategori: "Renklendirme & Balyaj",
           sira: 1,
           medya_turu: "image",
-          stilist: "Yıldız Aksoy",
+          stilist: "Yıldız Bayan Kuaförü",
           aciklama: "Doğal tonlama ve Olaplex bakımı",
         }),
       });
@@ -439,11 +482,51 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
   });
 
   describe("Gallery Likes API (/api/gallery/like)", () => {
+    beforeEach(() => {
+      mockAuthGetUser.mockResolvedValue({
+        data: { user: { id: "auth-user-123" } },
+        error: null,
+      });
+    });
+
+    it("POST oturumsuz kullanıcıya 401 döner (S9 - Şartname Madde 18)", async () => {
+      mockAuthGetUser.mockResolvedValueOnce({
+        data: { user: null },
+        error: null,
+      });
+
+      const req = new Request("http://localhost/api/gallery/like", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          galleryId: "test-gallery-id",
+          action: "like",
+        }),
+      });
+
+      const res = await GalleryLikePOST(req);
+      expect(res.status).toBe(401);
+    });
+
     it("POST eksik galleryId ile 400 döner", async () => {
       const req = new Request("http://localhost/api/gallery/like", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
+      });
+
+      const res = await GalleryLikePOST(req);
+      expect(res.status).toBe(400);
+    });
+
+    it("POST geçersiz action parametresini Zod ile 400 olarak reddeder (S9)", async () => {
+      const req = new Request("http://localhost/api/gallery/like", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          galleryId: "test-gallery-id",
+          action: "invalid-action",
+        }),
       });
 
       const res = await GalleryLikePOST(req);
@@ -467,12 +550,12 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       expect(json.begeniSayisi).toBeGreaterThanOrEqual(0);
     });
 
-    it("POST unlike aksiyonunu da kabul eder", async () => {
+    it("POST unlike aksiyonunu ve id alanını da kabul eder", async () => {
       const req = new Request("http://localhost/api/gallery/like", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          galleryId: "test-gallery-id",
+          id: "test-gallery-id",
           action: "unlike",
         }),
       });
@@ -481,6 +564,75 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
+    });
+  });
+
+  describe("Admin Media Upload API (/api/admin/upload - S7)", () => {
+    it("whitelist dışındaki folder parametresini (path traversal dahil) 400 ile reddeder", async () => {
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File([new Uint8Array([1, 2, 3])], "photo.jpg", { type: "image/jpeg" })
+      );
+      formData.append("folder", "../../etc");
+
+      const req = new Request("http://localhost/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const res = await AdminUploadPOST(req);
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toContain("klasör");
+    });
+
+    it("dosya uzantısını istemci dosya adından değil doğrulanmış MIME_TO_EXT haritasından türetir", async () => {
+      mockStorageUpload.mockResolvedValueOnce({ error: null });
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File([new Uint8Array([1, 2, 3])], "shell.php", { type: "image/png" })
+      );
+      formData.append("folder", "gallery");
+
+      const req = new Request("http://localhost/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const res = await AdminUploadPOST(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.fileName.endsWith(".png")).toBe(true);
+      expect(json.fileName.includes(".php")).toBe(false);
+    });
+
+    it("üretim ortamında (NODE_ENV=production) Supabase Storage başarısız olduğunda yerel diske düşmez ve 500 döner", async () => {
+      const envRecord = process.env as Record<string, string | undefined>;
+      const origEnv = envRecord.NODE_ENV;
+      envRecord.NODE_ENV = "production";
+      mockStorageUpload.mockResolvedValueOnce({ error: { message: "Bucket error" } });
+
+      try {
+        const formData = new FormData();
+        formData.append(
+          "file",
+          new File([new Uint8Array([1, 2, 3])], "test.webp", { type: "image/webp" })
+        );
+        formData.append("folder", "services");
+
+        const req = new Request("http://localhost/api/admin/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const res = await AdminUploadPOST(req);
+        expect(res.status).toBe(500);
+      } finally {
+        envRecord.NODE_ENV = origEnv;
+      }
     });
   });
 

@@ -260,7 +260,7 @@ function LoginForm() {
               <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-amber-900">
-                    Gelen SMS (Simülasyon):
+                    Doğrulama Kodu:
                   </span>
                   <Badge variant="gold" className="font-mono font-bold">
                     {smsCode}

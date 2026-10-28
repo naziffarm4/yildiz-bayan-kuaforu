@@ -19,15 +19,19 @@ export function createClient() {
       set(name: string, value: string, options: CookieOptions) {
         try {
           cookieStore.set({ name, value, ...options });
-        } catch {
-          // Server Component'lerde cookie set edilemez, middleware handle eder.
+        } catch (err: unknown) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn("Server Component çerez yazma atlandı:", err);
+          }
         }
       },
       remove(name: string, options: CookieOptions) {
         try {
           cookieStore.set({ name, value: '', ...options });
-        } catch {
-          // Server Component'lerde cookie silinemez, middleware handle eder.
+        } catch (err: unknown) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn("Server Component çerez silme atlandı:", err);
+          }
         }
       },
     },

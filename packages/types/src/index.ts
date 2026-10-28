@@ -166,7 +166,7 @@ export const GalleryItemSchema = z.object({
   baslik: z.string().min(2),
   kategori: z.string().min(2),
   gorselUrl: z.string().min(1),
-  stilist: z.string().min(2).default("Yıldız Aksoy"),
+  stilist: z.string().min(2).default("Yıldız Bayan Kuaförü"),
   aciklama: z.string().optional(),
   begeniSayisi: z.number().int().nonnegative().default(0),
   yorumSayisi: z.number().int().nonnegative().optional(),
@@ -496,6 +496,125 @@ export function calculateAppointmentTotalDuration(
 ): number {
   const servicesTotal = serviceDurations.reduce((acc, curr) => acc + (curr > 0 ? curr : 0), 0);
   return servicesTotal + (bufferMinutes > 0 ? bufferMinutes : 0);
+}
+
+const ISTANBUL_OFFSET_MS = 3 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseWorkingWindow(rangeStr?: string | null): { openMinutes: number; closeMinutes: number } | null {
+  if (!rangeStr) return null;
+  const normalized = rangeStr.toLowerCase();
+  if (normalized.includes("kapalı") || normalized.includes("kapali")) {
+    return null;
+  }
+  const match = rangeStr.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+
+  const openHour = Number(match[1]);
+  const openMin = Number(match[2]);
+  const closeHour = Number(match[3]);
+  const closeMin = Number(match[4]);
+
+  const openMinutes = openHour * 60 + openMin;
+  const closeMinutes = closeHour * 60 + closeMin;
+  if (closeMinutes <= openMinutes) return null;
+  return { openMinutes, closeMinutes };
+}
+
+/**
+ * Şartname Madde 4 & 15:
+ * Bekleyen randevunun oluşturulma zamanından itibaren çalışma saatleri ve
+ * özel günler (SpecialDay her zaman önceliklidir) dikkate alınarak kaç
+ * çalışma dakikası geçtiğini hesaplar.
+ */
+export function calculateElapsedWorkingMinutes(
+  createdAtIso: string,
+  nowIso: string,
+  workingHours: Record<string, string>,
+  specialDays?: SpecialDay[],
+): number {
+  const startMs = new Date(createdAtIso).getTime();
+  const endMs = new Date(nowIso).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+    return 0;
+  }
+
+  const shiftedStart = new Date(startMs + ISTANBUL_OFFSET_MS);
+  const shiftedEnd = new Date(endMs + ISTANBUL_OFFSET_MS);
+
+  let currentDayAnchorMs = Date.UTC(
+    shiftedStart.getUTCFullYear(),
+    shiftedStart.getUTCMonth(),
+    shiftedStart.getUTCDate(),
+  );
+  const lastDayAnchorMs = Date.UTC(
+    shiftedEnd.getUTCFullYear(),
+    shiftedEnd.getUTCMonth(),
+    shiftedEnd.getUTCDate(),
+  );
+
+  let totalWorkingMinutes = 0;
+
+  while (currentDayAnchorMs <= lastDayAnchorMs) {
+    const dayDate = new Date(currentDayAnchorMs);
+    const yyyy = dayDate.getUTCFullYear();
+    const mm = String(dayDate.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(dayDate.getUTCDate()).padStart(2, "0");
+    const dateKey = `${yyyy}-${mm}-${dd}`;
+    const dayOfWeek = dayDate.getUTCDay(); // 0: Pazar, 6: Cumartesi
+
+    const specialDay = specialDays?.find((sd) => sd.tarih === dateKey);
+    let scheduleStr: string | undefined;
+
+    if (specialDay) {
+      scheduleStr = specialDay.kapali ? "Kapalı" : specialDay.ozelSaatler;
+    } else if (dayOfWeek === 0) {
+      scheduleStr = workingHours.pazar;
+    } else if (dayOfWeek === 6) {
+      scheduleStr = workingHours.cumartesi;
+    } else {
+      scheduleStr = workingHours.haftaIci ?? workingHours.hafta_ici;
+    }
+
+    const windowRange = parseWorkingWindow(scheduleStr);
+    if (windowRange) {
+      const realDayMidnightMs = currentDayAnchorMs - ISTANBUL_OFFSET_MS;
+      const windowOpenMs = realDayMidnightMs + windowRange.openMinutes * 60 * 1000;
+      const windowCloseMs = realDayMidnightMs + windowRange.closeMinutes * 60 * 1000;
+
+      const overlapStart = Math.max(startMs, windowOpenMs);
+      const overlapEnd = Math.min(endMs, windowCloseMs);
+      if (overlapEnd > overlapStart) {
+        totalWorkingMinutes += (overlapEnd - overlapStart) / 60000;
+      }
+    }
+
+    currentDayAnchorMs += DAY_MS;
+  }
+
+  return Math.floor(totalWorkingMinutes);
+}
+
+/**
+ * Şartname Madde 4 & 15:
+ * Bekleyen randevunun çalışma saatleri içindeki blokaj süresinin (varsayılan 30 dk)
+ * dolup dolmadığını kontrol eder.
+ */
+export function isPendingAppointmentExpired(
+  createdAtIso: string,
+  nowIso: string,
+  timeoutMinutes: number,
+  workingHours: Record<string, string>,
+  specialDays?: SpecialDay[],
+): boolean {
+  const effectiveTimeout = timeoutMinutes > 0 ? timeoutMinutes : 30;
+  const elapsed = calculateElapsedWorkingMinutes(
+    createdAtIso,
+    nowIso,
+    workingHours,
+    specialDays,
+  );
+  return elapsed >= effectiveTimeout;
 }
 
 // --- ORTAK GÜVENLİ KİMLİK / UUID YARDIMCISI ---

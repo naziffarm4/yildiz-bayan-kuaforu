@@ -1,5 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
-import type { Database, Json } from "@yildiz/types";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type { Json } from "@yildiz/types";
 
 export interface GooglePlacesReview {
   authorAttribution?: {
@@ -34,23 +34,6 @@ export interface GooglePlacesResponse {
     message?: string;
     status?: string;
   };
-}
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !serviceKey) {
-    return null;
-  }
-
-  return createClient<Database>(url, serviceKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
 }
 
 export async function executeGoogleSync(force = false) {
@@ -136,8 +119,8 @@ export async function executeGoogleSync(force = false) {
         incomingReviews = placeData.reviews;
       }
     }
-  } catch {
-    // Ağ hatası durumunda varsayılan doğrulanmış değerler korunur
+  } catch (err: unknown) {
+    console.warn("Google Places API çağrısı başarısız, varsayılan değerler korunuyor:", err);
   }
 
   let newReviewsCount = 0;

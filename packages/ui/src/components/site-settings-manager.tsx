@@ -691,7 +691,7 @@ export const SiteSettingsManager: React.FC<SiteSettingsManagerProps> = ({
                       heroMedia: { ...pageTextsForm.heroMedia, altBaslik: e.target.value },
                     })
                   }
-                  placeholder="Yıldız Aksoy Salon Koleksiyonu"
+                  placeholder="Yıldız Bayan Kuaförü Özel Koleksiyonu"
                   className="w-full px-3 py-2 border border-border rounded-md text-xs bg-white text-text-primary focus:ring-1 focus:ring-accent-gold outline-none"
                 />
               </div>
@@ -937,7 +937,7 @@ export const SiteSettingsManager: React.FC<SiteSettingsManagerProps> = ({
                       artist: { ...pageTextsForm.artist, adSoyad: e.target.value },
                     })
                   }
-                  placeholder="Yıldız Aksoy"
+                  placeholder="Yıldız Bayan Kuaförü"
                   className="w-full px-3 py-2 border border-border rounded-md text-xs bg-white text-text-primary focus:ring-1 focus:ring-accent-gold outline-none"
                 />
               </div>
@@ -1109,7 +1109,7 @@ export const SiteSettingsManager: React.FC<SiteSettingsManagerProps> = ({
                     artist: { ...pageTextsForm.artist, butonMetni: e.target.value },
                   })
                 }
-                placeholder="Yıldız Hanım ile Randevu Oluştur →"
+                placeholder="Randevu Oluştur →"
                 className="w-full px-3 py-2 border border-border rounded-md text-xs bg-white text-text-primary focus:ring-1 focus:ring-accent-gold outline-none"
               />
             </div>

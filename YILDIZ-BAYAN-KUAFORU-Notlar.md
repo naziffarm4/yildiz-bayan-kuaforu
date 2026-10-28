@@ -14,6 +14,7 @@ Mock aşaması bittiğinde biriken notlar tek seferde ana belgeye işlenecek ve 
 ## Açık Notlar
  
 - **27 Ekim, Bölüm 12 Renk Paleti:** Kullanıcı talimatı doğrultusunda referans alınan BeautyZone (`https://beautyzone.dexignzone.com/xhtml/index-7.html`) şablonunun orijinal renk paleti (Canlı Salon Pembesi `#ff5ea5`, Koyu Pembe `#ed3d8b`, Turkuaz `#00becf`, Derin Mürdüm `#320016`, vb.) ana gereksinim belgesine resmi palet olarak işlendi. Ayrıca tüm renklerin bileşenlerden (JSX) arındırılarak `globals.css` içindeki CSS değişkenleri üzerinden yönetilmesi zorunlu kılındı.
+- **28 Ekim, Bölüm 12 Renk Paleti:** Menü (header) arka planının her koşulda saf beyaz (`#FFFFFF`) görünmesi için renk paletine `--color-bg-header: #FFFFFF` değişkeni eklendi, `--bg-primary` geriye dönük uyumluluk değişkeni `#FFFFFF` yapıldı ve `tailwind.config.ts` içindeki CSS değişkeni tabanlı renk token'larına `<alpha-value>` (`color-mix`) desteği kazandırıldı.
  
 ---
 

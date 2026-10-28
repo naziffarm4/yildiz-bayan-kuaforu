@@ -43,7 +43,7 @@ export const DEFAULT_PAGE_TEXTS: PageTexts = {
       "https://images.unsplash.com/photo-1560869713-7d0a29430803?auto=format&fit=crop&w=1000&q=85",
     rozet: "Haute Coiffure 2026",
     baslik: "Zarif Dalgalar & Sıcak Bal Yansımaları",
-    altBaslik: "Yıldız Aksoy Salon Koleksiyonu",
+    altBaslik: "Yıldız Bayan Kuaförü Özel Koleksiyonu",
   },
   heroFeatures: [
     {
@@ -65,13 +65,13 @@ export const DEFAULT_PAGE_TEXTS: PageTexts = {
     altBaslik:
       "Kalabalık salonların telaşından uzak; sadece size, saçınıza ve zevkinize adanmış özel bir zaman dilimi.",
     etiket: "Haute Coiffure Sanatçısı",
-    adSoyad: "Yıldız Aksoy",
+    adSoyad: "Yıldız Bayan Kuaförü",
     unvan: "Master Stilist • Renk & Kesim Tasarımcısı",
     gorselUrl:
       "https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?auto=format&fit=crop&w=800&q=80",
     gorselRozet: "👑 Kurucu & Master Stilist",
     alintiSoz:
-      "YILDIZ BAYAN KUAFÖRÜ’nde her misafirimiz bizzat salon kurucumuz Yıldız Hanım tarafından, kişiye özel ayrılan zaman diliminde, aceleye getirilmeden ve en yüksek kalitede ağırlanır.",
+      "YILDIZ BAYAN KUAFÖRÜ’nde her misafirimiz uzman tasarım ekibimiz tarafından, kişiye özel ayrılan zaman diliminde, aceleye getirilmeden ve en yüksek kalitede ağırlanır.",
     biyografi:
       "15 yılı aşkın tecrübe, uluslararası eğitimler ve yüz analitiğine dayalı saç tasarımı. Her seans öncesinde yapılan detaylı saç analizimiz ile ten alt tonunuza en uygun balyaj formülü hazırlanır.",
     vipOzellikler: [
@@ -88,7 +88,7 @@ export const DEFAULT_PAGE_TEXTS: PageTexts = {
         aciklama: "Olaplex ve amonyaksız koruyucu saç formülleri.",
       },
     ],
-    butonMetni: "Yıldız Hanım ile Randevu Oluştur →",
+    butonMetni: "Randevu Oluştur →",
   },
   servicesSection: {
     rozet: "Özel Hizmet Kataloğu",
@@ -125,7 +125,7 @@ export const DEFAULT_PAGE_TEXTS: PageTexts = {
   },
   about: {
     quote: "Güzellik, aceleye getirilmeyecek kadar kutsal bir sanattır.",
-    founder: "Yıldız Aksoy — Kurucu & Master Stilist",
+    founder: "Yıldız Bayan Kuaförü — Kurucu & Master Stilist",
     storyTitle:
       "Standart Kuaför Kalıplarının Ötesinde, Sadece Size Ayrılmış Bir Zaman Dilimi",
     storyText:

@@ -235,7 +235,7 @@ export default function GalleryPage() {
                         {item.baslik}
                       </h3>
                       <p className="text-xs text-text-secondary mt-1">
-                        Stilist: <strong className="text-text-primary">{item.stilist || "Yıldız Aksoy"}</strong>
+                        Stilist: <strong className="text-text-primary">{item.stilist || "Yıldız Bayan Kuaförü"}</strong>
                       </p>
                     </div>
                   </div>
@@ -330,7 +330,7 @@ export default function GalleryPage() {
                 {/* Stilist & Lokasyon Bilgi Satırı */}
                 <div className="mt-4 pt-3 border-t border-border-main/80 flex items-center justify-between text-xs text-text-secondary">
                   <span>
-                    Stilist: <strong className="text-text-primary">{selectedPhoto.stilist || "Yıldız Aksoy"}</strong>
+                    Stilist: <strong className="text-text-primary">{selectedPhoto.stilist || "Yıldız Bayan Kuaförü"}</strong>
                   </span>
                   <span>Bağdat Caddesi</span>
                 </div>

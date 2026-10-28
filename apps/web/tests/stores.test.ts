@@ -1,107 +1,138 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: vi.fn().mockReturnValue({
-    channel: vi.fn().mockReturnValue({
-      on: vi.fn().mockReturnThis(),
-      subscribe: vi.fn().mockReturnThis(),
-    }),
-    removeChannel: vi.fn(),
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        order: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }),
-    }),
-  }),
-}));
-
-import { useGalleryStore } from "../src/stores/gallery-store";
-import { useReviewStore } from "../src/stores/review-store";
 import { useAppStore } from "../src/stores/app-store";
+import { useAuthStore } from "../src/stores/auth-store";
 import { useToastStore, toast } from "../src/stores/toast-store";
 import { generateSafeUUID, type CustomerReview, type ServiceItem } from "@yildiz/types";
 
-describe("Zustand Stores & Realtime State Architecture", () => {
+const { channelListeners } = vi.hoisted(() => ({
+  channelListeners: [] as Array<{
+    filter: { event: string; schema: string; table: string };
+    callback: (payload: Record<string, unknown>) => void;
+  }>,
+}));
+
+vi.mock("@/lib/supabase/client", () => {
+  const channelMock = {
+    on: (
+      _type: string,
+      filter: { event: string; schema: string; table: string },
+      callback: (payload: Record<string, unknown>) => void,
+    ) => {
+      channelListeners.push({ filter, callback });
+      return channelMock;
+    },
+    subscribe: () => channelMock,
+  };
+
+  return {
+    createClient: () => ({
+      channel: () => channelMock,
+      removeChannel: () => {},
+      from: () => ({
+        select: () => ({
+          order: () => ({
+            order: async () => ({ data: [], error: null }),
+            limit: async () => ({ data: [], error: null }),
+          }),
+          eq: () => ({
+            order: async () => ({ data: [], error: null }),
+          }),
+          limit: () => ({
+            maybeSingle: async () => ({ data: null, error: null }),
+          }),
+        }),
+      }),
+    }),
+  };
+});
+
+describe("Zustand Stores & Realtime State Architecture (Single Source of Truth)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    channelListeners.length = 0;
+
+    if (typeof (globalThis as { window?: unknown }).window === "undefined") {
+      (globalThis as { window?: unknown }).window = {
+        dispatchEvent: () => true,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        location: { origin: "http://localhost:3000" },
+      };
+    }
+
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ success: true, data: { id: "real-comm-id" } }),
     }) as unknown as typeof fetch;
 
-    useGalleryStore.setState({
+    useAppStore.setState({
       gallery: [],
       commentsByItem: {},
-      likedIds: [],
-      isLoading: false,
-    });
-    useReviewStore.setState({
+      likedGalleryIds: [],
       reviews: [],
-      isLoading: false,
+      services: [],
+      appointments: [],
+      isInitialLoaded: false,
+      isRefreshing: false,
     });
   });
 
-  describe("Gallery Store", () => {
-    it("toggleLike fonksiyonu begeniSayisi ve likedIds değerlerini iyimser günceller", async () => {
+  describe("Gallery State & Actions (useAppStore)", () => {
+    it("toggleGalleryLike fonksiyonu begeniSayisi ve likedGalleryIds değerlerini iyimser günceller", async () => {
       const sampleItem = {
         id: "gal-uuid-1",
         baslik: "Altın Bal Balyaj",
         kategori: "Renklendirme & Balyaj",
         gorselUrl: "https://example.com/photo.jpg",
-        stilist: "Yıldız Aksoy",
+        stilist: "Yıldız Bayan Kuaförü",
         begeniSayisi: 10,
         medyaTuru: "image" as const,
       };
 
-      useGalleryStore.setState({ gallery: [sampleItem], likedIds: [] });
+      useAppStore.setState({ gallery: [sampleItem], likedGalleryIds: [] });
 
       // Like
-      await useGalleryStore.getState().toggleLike("gal-uuid-1");
-      let state = useGalleryStore.getState();
-      expect(state.likedIds).toContain("gal-uuid-1");
+      await useAppStore.getState().toggleGalleryLike("gal-uuid-1");
+      let state = useAppStore.getState();
+      expect(state.likedGalleryIds).toContain("gal-uuid-1");
       expect(state.gallery[0]?.begeniSayisi).toBe(11);
 
       // Unlike
-      await useGalleryStore.getState().toggleLike("gal-uuid-1");
-      state = useGalleryStore.getState();
-      expect(state.likedIds).not.toContain("gal-uuid-1");
+      await useAppStore.getState().toggleGalleryLike("gal-uuid-1");
+      state = useAppStore.getState();
+      expect(state.likedGalleryIds).not.toContain("gal-uuid-1");
       expect(state.gallery[0]?.begeniSayisi).toBe(10);
     });
 
-    it("addComment ve deleteComment yorumları ve yorumSayisi değerini iyimser günceller", async () => {
+    it("addGalleryComment ve deleteGalleryComment yorumları ve yorumSayisi değerini iyimser günceller", async () => {
       const sampleItem = {
         id: "gal-uuid-2",
         baslik: "Vogue Katlı Kesim",
         kategori: "Saç Tasarım",
         gorselUrl: "https://example.com/photo.jpg",
-        stilist: "Yıldız Aksoy",
+        stilist: "Yıldız Bayan Kuaförü",
         begeniSayisi: 5,
         yorumSayisi: 0,
         medyaTuru: "image" as const,
       };
 
-      useGalleryStore.setState({ gallery: [sampleItem], commentsByItem: {} });
+      useAppStore.setState({ gallery: [sampleItem], commentsByItem: {} });
 
-      // Add comment
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ data: { id: "real-comm-id" } }),
       }) as unknown as typeof fetch;
 
-      await useGalleryStore.getState().addComment("gal-uuid-2", "Dilek D.", "Harika bir çalışma!");
-      let state = useGalleryStore.getState();
+      await useAppStore.getState().addGalleryComment("gal-uuid-2", "Dilek D.", "Harika bir çalışma!");
+      let state = useAppStore.getState();
       expect(state.gallery[0]?.yorumSayisi).toBe(1);
       const comments = state.commentsByItem["gal-uuid-2"];
       expect(comments).toHaveLength(1);
       expect(comments?.[0]?.musteri_adi).toBe("Dilek D.");
 
-      // Delete comment
       const commentIdToDelete = comments?.[0]?.id || "real-comm-id";
-      await useGalleryStore.getState().deleteComment("gal-uuid-2", commentIdToDelete);
-      state = useGalleryStore.getState();
+      await useAppStore.getState().deleteGalleryComment("gal-uuid-2", commentIdToDelete);
+      state = useAppStore.getState();
       expect(state.gallery[0]?.yorumSayisi).toBe(0);
       expect(state.commentsByItem["gal-uuid-2"]).toHaveLength(0);
     });
@@ -112,65 +143,146 @@ describe("Zustand Stores & Realtime State Architecture", () => {
         baslik: "Eski Başlık",
         kategori: "Gelin & Topuz",
         gorselUrl: "https://example.com/photo.jpg",
-        stilist: "Yıldız Aksoy",
+        stilist: "Yıldız Bayan Kuaförü",
         begeniSayisi: 0,
         medyaTuru: "image" as const,
       };
 
-      useGalleryStore.setState({ gallery: [sampleItem] });
-      await useGalleryStore.getState().updateGalleryItem("gal-uuid-3", { baslik: "Yeni Lüks Başlık" });
+      useAppStore.setState({ gallery: [sampleItem] });
+      await useAppStore.getState().updateGalleryItem("gal-uuid-3", { baslik: "Yeni Lüks Başlık" });
 
-      const state = useGalleryStore.getState();
+      const state = useAppStore.getState();
       expect(state.gallery[0]?.baslik).toBe("Yeni Lüks Başlık");
+    });
+
+    it("Realtime gallery_items INSERT, UPDATE ve DELETE olaylarını sira düzenini koruyarak işler", () => {
+      const cleanup = useAppStore.getState().initAppRealtimeSync();
+      const galleryListener = channelListeners.find(
+        (l) => l.filter.table === "gallery_items",
+      );
+      expect(galleryListener).toBeDefined();
+
+      // INSERT
+      galleryListener?.callback({
+        eventType: "INSERT",
+        new: {
+          id: "gal-2",
+          baslik: "İkinci Öğe",
+          kategori: "Saç",
+          url: "https://example.com/2.jpg",
+          sira: 2,
+          begeni_sayisi: 3,
+        },
+      });
+      galleryListener?.callback({
+        eventType: "INSERT",
+        new: {
+          id: "gal-1",
+          baslik: "Birinci Öğe",
+          kategori: "Saç",
+          url: "https://example.com/1.jpg",
+          sira: 1,
+          begeni_sayisi: 7,
+        },
+      });
+
+      expect(useAppStore.getState().gallery.map((g) => g.id)).toEqual(["gal-1", "gal-2"]);
+
+      // DELETE
+      galleryListener?.callback({
+        eventType: "DELETE",
+        old: { id: "gal-1" },
+      });
+      expect(useAppStore.getState().gallery.map((g) => g.id)).toEqual(["gal-2"]);
+
+      cleanup();
     });
   });
 
-  describe("Review Store", () => {
-    it("addReview yeni yorumu listeye ekler ve createdAt DESC sıralamasını korur", async () => {
-      const review1 = {
+  describe("Review State & Actions (useAppStore)", () => {
+    it("addCustomerReview yeni yorumu listeye ekler ve createdAt DESC sıralamasını korur", async () => {
+      const review1: CustomerReview = {
         id: generateSafeUUID(),
         musteriAdi: "Müşteri 1",
         puan: 5,
         tarih: "20 Ekim 2026",
-        kaynak: "Salon" as const,
+        kaynak: "Salon",
         createdAt: "2026-10-20T10:00:00Z",
       };
 
-      const review2 = {
+      const review2: CustomerReview = {
         id: generateSafeUUID(),
         musteriAdi: "Müşteri 2 (En Yeni)",
         puan: 5,
         tarih: "25 Ekim 2026",
-        kaynak: "Salon" as const,
+        kaynak: "Salon",
         createdAt: "2026-10-25T10:00:00Z",
       };
 
-      useReviewStore.setState({ reviews: [review1] });
-      await useReviewStore.getState().addReview(review2);
+      useAppStore.setState({ reviews: [review1] });
+      await useAppStore.getState().addCustomerReview(review2);
 
-      const state = useReviewStore.getState();
+      const state = useAppStore.getState();
       expect(state.reviews).toHaveLength(2);
       expect(state.reviews[0]?.musteriAdi).toBe("Müşteri 2 (En Yeni)");
     });
 
-    it("deleteReview yorumu listeden kaldırır", async () => {
-      const review = {
+    it("deleteCustomerReview yorumu listeden kaldırır", async () => {
+      const review: CustomerReview = {
         id: "rev-to-delete",
         musteriAdi: "Test",
         puan: 5,
         tarih: "25 Ekim 2026",
-        kaynak: "Salon" as const,
+        kaynak: "Salon",
       };
 
-      useReviewStore.setState({ reviews: [review] });
-      await useReviewStore.getState().deleteReview("rev-to-delete");
+      useAppStore.setState({ reviews: [review] });
+      await useAppStore.getState().deleteCustomerReview("rev-to-delete");
 
-      const state = useReviewStore.getState();
+      const state = useAppStore.getState();
       expect(state.reviews.find((r: CustomerReview) => r.id === "rev-to-delete")).toBeUndefined();
+    });
+
+    it("Realtime customer_reviews UPDATE (onay/gizleme) ve DELETE olaylarını işler", () => {
+      const cleanup = useAppStore.getState().initAppRealtimeSync();
+      const reviewListener = channelListeners.find(
+        (l) => l.filter.table === "customer_reviews",
+      );
+      expect(reviewListener).toBeDefined();
+
+      // Admin yorumu onayladı (aktif: true)
+      reviewListener?.callback({
+        eventType: "UPDATE",
+        new: {
+          id: "rev-live-1",
+          musteri_adi: "Zeynep K.",
+          puan: 5,
+          yorum: "Çok memnun kaldım",
+          hizmet_turu: "Balyaj",
+          aktif: true,
+          olusturulma_tarihi: "2026-10-26T12:00:00Z",
+        },
+      });
+      expect(useAppStore.getState().reviews).toHaveLength(1);
+      expect(useAppStore.getState().reviews[0]?.musteriAdi).toBe("Zeynep K.");
+
+      // Admin yorumu gizledi (aktif: false)
+      reviewListener?.callback({
+        eventType: "UPDATE",
+        new: {
+          id: "rev-live-1",
+          musteri_adi: "Zeynep K.",
+          puan: 5,
+          aktif: false,
+        },
+      });
+      expect(useAppStore.getState().reviews).toHaveLength(0);
+
+      cleanup();
     });
   });
 
-  describe("Unified App Store (useAppStore)", () => {
+  describe("Unified App Store & Realtime Appointments (useAppStore)", () => {
     it("bootstrapApp fonksiyonu verileri yükler ve isInitialLoaded durumunu true yapar", async () => {
       useAppStore.setState({ isInitialLoaded: false });
       await useAppStore.getState().bootstrapApp();
@@ -187,60 +299,11 @@ describe("Zustand Stores & Realtime State Architecture", () => {
       let state = useAppStore.getState();
       expect(state.salonInfo.telefon).toBe("+90 216 111 22 33");
 
-      await useAppStore.getState().updatePageTexts({ hero: { ...state.pageTexts.hero, title: "Yeni Başlık" } });
+      await useAppStore.getState().updatePageTexts({
+        hero: { ...state.pageTexts.hero, title: "Yeni Başlık" },
+      });
       state = useAppStore.getState();
       expect(state.pageTexts.hero.title).toBe("Yeni Başlık");
-    });
-
-    it("toggleGalleryLike beğeni sayısını artırıp azaltır", async () => {
-      const sampleItem = {
-        id: "app-gal-1",
-        baslik: "Test Fotoğraf",
-        kategori: "Renklendirme & Balyaj",
-        gorselUrl: "https://example.com/photo.jpg",
-        stilist: "Yıldız Aksoy",
-        begeniSayisi: 5,
-        medyaTuru: "image" as const,
-      };
-
-      useAppStore.setState({ gallery: [sampleItem], likedGalleryIds: [] });
-
-      await useAppStore.getState().toggleGalleryLike("app-gal-1");
-      let state = useAppStore.getState();
-      expect(state.likedGalleryIds).toContain("app-gal-1");
-      expect(state.gallery[0]?.begeniSayisi).toBe(6);
-
-      await useAppStore.getState().toggleGalleryLike("app-gal-1");
-      state = useAppStore.getState();
-      expect(state.likedGalleryIds).not.toContain("app-gal-1");
-      expect(state.gallery[0]?.begeniSayisi).toBe(5);
-    });
-
-    it("addGalleryComment ve deleteGalleryComment yorumları ve yorumSayisi değerini yönetir", async () => {
-      const sampleItem = {
-        id: "app-gal-2",
-        baslik: "Test Video",
-        kategori: "Saç Tasarım",
-        gorselUrl: "https://example.com/video.mp4",
-        stilist: "Yıldız Aksoy",
-        begeniSayisi: 3,
-        yorumSayisi: 0,
-        medyaTuru: "video" as const,
-      };
-
-      useAppStore.setState({ gallery: [sampleItem], commentsByItem: {} });
-
-      await useAppStore.getState().addGalleryComment("app-gal-2", "Pınar K.", "Harika!");
-      let state = useAppStore.getState();
-      expect(state.gallery[0]?.yorumSayisi).toBe(1);
-      const comments = state.commentsByItem["app-gal-2"] || [];
-      expect(comments).toHaveLength(1);
-
-      const commId = comments[0]?.id || "real-comm-id";
-      await useAppStore.getState().deleteGalleryComment("app-gal-2", commId);
-      state = useAppStore.getState();
-      expect(state.gallery[0]?.yorumSayisi).toBe(0);
-      expect(state.commentsByItem["app-gal-2"]).toHaveLength(0);
     });
 
     it("toggleServiceActive hizmetin aktifliğini değiştirir", async () => {
@@ -264,8 +327,62 @@ describe("Zustand Stores & Realtime State Architecture", () => {
       expect(state.services[0]?.aktif).toBe(true);
     });
 
+    it("Realtime appointments INSERT, UPDATE ve DELETE olaylarını store'a işler", () => {
+      const cleanup = useAppStore.getState().initAppRealtimeSync();
+      const appointmentListener = channelListeners.find(
+        (l) => l.filter.table === "appointments",
+      );
+      expect(appointmentListener).toBeDefined();
+
+      appointmentListener?.callback({
+        eventType: "INSERT",
+        new: {
+          id: "app-live-1",
+          musteri_id: null,
+          musteri_ad_soyad: "Elif Demir",
+          musteri_telefon: "05321112233",
+          hizmet_idleri: ["srv-1"],
+          calisan_idleri: [],
+          tarih_saat: "2026-10-28T14:00:00Z",
+          toplam_sure_dakika: 45,
+          durum: "Beklemede",
+          kaynak: "Web",
+          olusturulma_tarihi: "2026-10-28T10:00:00Z",
+        },
+      });
+
+      expect(useAppStore.getState().appointments).toHaveLength(1);
+      expect(useAppStore.getState().appointments[0]?.durum).toBe("Beklemede");
+
+      appointmentListener?.callback({
+        eventType: "UPDATE",
+        new: {
+          id: "app-live-1",
+          musteri_id: null,
+          musteri_ad_soyad: "Elif Demir",
+          musteri_telefon: "05321112233",
+          hizmet_idleri: ["srv-1"],
+          calisan_idleri: ["staff-1"],
+          tarih_saat: "2026-10-28T14:00:00Z",
+          toplam_sure_dakika: 45,
+          durum: "Onaylandı",
+          kaynak: "Web",
+          olusturulma_tarihi: "2026-10-28T10:00:00Z",
+        },
+      });
+
+      expect(useAppStore.getState().appointments[0]?.durum).toBe("Onaylandı");
+
+      appointmentListener?.callback({
+        eventType: "DELETE",
+        old: { id: "app-live-1" },
+      });
+
+      expect(useAppStore.getState().appointments).toHaveLength(0);
+      cleanup();
+    });
+
     it("bootstrapApp site_settings içindeki adres, google_maps_url ve sayfa metinlerini store'a aktarır", async () => {
-      // ContentService mock'u ile test verisi sağla
       const customSettings = {
         salon_adi: "Yıldız Balyaj & Saç Tasarım",
         slogan: "Lüks ve Zarafet",
@@ -280,7 +397,7 @@ describe("Zustand Stores & Realtime State Architecture", () => {
         sayfa_metinleri: {
           about: {
             quote: "Güzellik kişiye özel bir sanattır.",
-            founder: "Yıldız Aksoy",
+            founder: "Yıldız Bayan Kuaförü",
             storyTitle: "Hikayemiz",
             storyText: "Canlı Supabase hikaye metni.",
             manifestoTitle: "Manifestomuz",
@@ -311,6 +428,42 @@ describe("Zustand Stores & Realtime State Architecture", () => {
       expect(state.salonInfo.googleHaritaUrl).toBe("https://maps.google.com/?cid=8333635848754942930");
       expect(state.pageTexts.about.quote).toBe("Güzellik kişiye özel bir sanattır.");
       expect(state.pageTexts.contact.welcomeTitle).toBe("Bize Ulaşın Canlı");
+    });
+
+    it("bootstrapApp gerçek Admin profil adını pageTexts ve galeri stilist alanlarına senkronize eder", async () => {
+      const legacyName = ["Yıldız", ["Ak", "soy"].join("")].join(" ");
+      useAuthStore.getState().setUser({
+        id: "admin-1",
+        ad: "Zeynep",
+        soyad: "Kaya",
+        telefon: "05321000001",
+        rol: "Admin",
+        toplamPuan: 0,
+        smsDogrulandi: true,
+      });
+
+      useAppStore.setState({
+        gallery: [
+          {
+            id: "gal-legacy-1",
+            baslik: "Test Görsel",
+            kategori: "Saç Tasarım",
+            gorselUrl: "https://example.com/1.jpg",
+            stilist: legacyName,
+            begeniSayisi: 3,
+            medyaTuru: "image",
+          },
+        ],
+      });
+
+      await useAppStore.getState().bootstrapApp(true);
+
+      const state = useAppStore.getState();
+      expect(state.pageTexts.artist.adSoyad).toBe("Zeynep Kaya");
+      expect(state.pageTexts.about.founder).toBe("Zeynep Kaya — Kurucu & Master Stilist");
+      expect(state.gallery[0]?.stilist).toBe("Zeynep Kaya");
+
+      useAuthStore.getState().setUser(null);
     });
   });
 

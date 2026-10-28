@@ -42,7 +42,8 @@ export function withStaffOrAdminAuth<TContext = unknown>(
 
       const safeRequest = request || new Request("http://localhost");
       return await handler(safeRequest, context);
-    } catch {
+    } catch (err: unknown) {
+      console.warn("API Guard yetkilendirme doğrulaması sırasında hata:", err);
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
     }
   };

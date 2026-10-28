@@ -5,13 +5,16 @@ import { executeGoogleSync } from "@/services/google-sync.service";
 
 export async function GET(request: Request) {
   try {
-    const cronSecret = process.env.CRON_SECRET || "yildiz-salon-google-sync-cron-key-2026";
-    const authHeader = request.headers.get("authorization");
-    const url = new URL(request.url);
-    const querySecret = url.searchParams.get("secret");
+    const cronSecret = process.env.CRON_SECRET?.trim();
+    if (!cronSecret) {
+      return NextResponse.json(
+        { error: "Sunucu yapılandırma hatası: CRON_SECRET tanımlı değil." },
+        { status: 500 }
+      );
+    }
 
-    const isAuthorized =
-      authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret;
+    const authHeader = request.headers.get("authorization");
+    const isAuthorized = authHeader === `Bearer ${cronSecret}`;
 
     if (!isAuthorized) {
       return NextResponse.json(
@@ -20,6 +23,7 @@ export async function GET(request: Request) {
       );
     }
 
+    const url = new URL(request.url);
     const force = url.searchParams.get("force") === "true";
     const result = await executeGoogleSync(force);
 

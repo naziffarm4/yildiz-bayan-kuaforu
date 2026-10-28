@@ -10,6 +10,12 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/api/")) {
+    return response;
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -34,8 +40,6 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const { pathname } = request.nextUrl;
-
   // Oturum ve kullanıcıyı doğrula
   const {
     data: { user },
@@ -52,7 +56,7 @@ export async function middleware(request: NextRequest) {
     let userRole: string | null = null;
 
     try {
-      const adminClient = process.env.SUPABASE_SERVICE_ROLE_KEY ? getSupabaseAdmin() : null;
+      const adminClient = getSupabaseAdmin();
       const dbClient = adminClient || supabase;
 
       const { data: profile } = await dbClient
@@ -64,13 +68,13 @@ export async function middleware(request: NextRequest) {
       if (profile?.rol) {
         userRole = profile.rol;
       }
-    } catch {
-      // Veritabanı sorgusu başarısız olursa metadata fallback'e geçilir
+    } catch (err: unknown) {
+      console.warn("Middleware profil rol sorgusu başarısız oldu:", err);
     }
 
     if (!userRole) {
       userRole =
-        (user.user_metadata?.rol as string | undefined) ||
+        (user.app_metadata?.rol as string | undefined) ||
         (user.app_metadata?.role as string | undefined) ||
         null;
     }
@@ -98,11 +102,12 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except:
+     * - api (API routes handle their own auth)
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * - favicon.ico, sitemap.xml, robots.txt
      * - public files (svg, png, jpg, jpeg, gif, webp)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api/|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

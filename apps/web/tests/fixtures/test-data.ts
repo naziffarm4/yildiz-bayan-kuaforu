@@ -122,7 +122,7 @@ export const MOCK_STAFF: StaffProfile[] = [
   {
     id: "b2010000-0000-4000-8000-000000000001",
     ad: "Yıldız",
-    soyad: "Aksoy",
+    soyad: "Yönetici",
     unvan: "Master Stilist & Kurucu",
     telefon: "05321000001",
     eposta: "yildiz@yildizkuafor.com",
@@ -261,7 +261,7 @@ export const MOCK_GALLERY: GalleryItem[] = [
     baslik: "Vogue Tarzı Katlı Kesim & Hacimli Fön",
     kategori: "Saç Tasarım",
     gorselUrl: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=1000&q=80",
-    stilist: "Yıldız Aksoy",
+    stilist: "Yıldız Bayan Kuaförü",
     aciklama: "Yüz kemik yapısını ortaya çıkaran zarif katlar ve ipeksi parlaklık.",
     begeniSayisi: 198,
     medyaTuru: "image",

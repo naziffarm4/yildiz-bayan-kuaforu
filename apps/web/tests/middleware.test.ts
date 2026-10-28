@@ -22,6 +22,7 @@ describe("Next.js Middleware: Auth & Role Koruması", () => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://mock.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "mock-anon-key";
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   });
 
   it("/admin rotasına oturumsuz erişildiğinde /giris?redirect=/admin sayfasına yönlendirir", async () => {
@@ -124,34 +125,20 @@ describe("Next.js Middleware: Auth & Role Koruması", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
-  it("/admin rotasına DB profili olmayan fakat user_metadata.rol 'Admin' olan kullanıcı eriştiğinde izin verir", async () => {
-    mockGetUser.mockResolvedValue({
-      data: {
-        user: {
-          id: "admin-fallback-123",
-          user_metadata: { rol: "Admin" },
-        },
-      },
-      error: null,
-    });
-    mockSingle.mockResolvedValue({
-      data: null,
-      error: null,
-    });
-
-    const req = new NextRequest("http://localhost/admin");
+  it("/api/* rotalarında gereksiz supabase.auth.getUser() ağ turunu atlar ve doğrudan geçişe izin verir", async () => {
+    const req = new NextRequest("http://localhost/api/appointments");
     const res = await middleware(req);
 
     expect(res.status).toBe(200);
-    expect(res.headers.get("location")).toBeNull();
+    expect(mockGetUser).not.toHaveBeenCalled();
   });
 
-  it("/admin rotasına DB profili olmayan ve metadata rolü yetkisiz olan kullanıcıyı /giris?error=unauthorized sayfasına yönlendirir", async () => {
+  it("/admin rotasına DB profili olmayan ve yalnızca istemci kontrolündeki user_metadata.rol 'Admin' olan kullanıcıyı reddeder (S4)", async () => {
     mockGetUser.mockResolvedValue({
       data: {
         user: {
-          id: "guest-fallback-123",
-          user_metadata: { rol: "Musteri" },
+          id: "spoofed-user-123",
+          user_metadata: { rol: "Admin" },
         },
       },
       error: null,
@@ -168,5 +155,51 @@ describe("Next.js Middleware: Auth & Role Koruması", () => {
     const location = res.headers.get("location");
     expect(location).toContain("/giris");
     expect(location).toContain("error=unauthorized");
+  });
+
+  it("/admin rotasına DB profili olmayan ancak sunucu kontrollü app_metadata.rol 'Admin' olan kullanıcıya izin verir", async () => {
+    mockGetUser.mockResolvedValue({
+      data: {
+        user: {
+          id: "server-admin-123",
+          app_metadata: { rol: "Admin" },
+        },
+      },
+      error: null,
+    });
+    mockSingle.mockResolvedValue({
+      data: null,
+      error: null,
+    });
+
+    const req = new NextRequest("http://localhost/admin");
+    const res = await middleware(req);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("/admin rotasında veritabanı sorgusu hata fırlattığında console.warn basar ve yetkisiz yönlendirir", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    mockGetUser.mockResolvedValue({
+      data: {
+        user: {
+          id: "guest-fallback-123",
+          user_metadata: { rol: "Admin" },
+        },
+      },
+      error: null,
+    });
+    mockSingle.mockRejectedValue(new Error("DB connection failed"));
+
+    const req = new NextRequest("http://localhost/admin");
+    const res = await middleware(req);
+
+    expect(warnSpy).toHaveBeenCalled();
+    expect(res.status).toBe(307);
+    const location = res.headers.get("location");
+    expect(location).toContain("/giris");
+    expect(location).toContain("error=unauthorized");
+    warnSpy.mockRestore();
   });
 });

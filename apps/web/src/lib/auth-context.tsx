@@ -69,7 +69,7 @@ export function getDevAuthUser(identifier: string): AuthUser {
         ? "c1010000-0000-4000-8000-000000000001"
         : "u1010000-0000-4000-8000-000000000001",
     ad: isSpecial ? "Yıldız" : isCalisan ? staffName.ad : "Selin",
-    soyad: isSpecial ? "Aksoy" : isCalisan ? staffName.soyad : "Doğan",
+    soyad: isSpecial ? "Yönetici" : isCalisan ? staffName.soyad : "Doğan",
     telefon: identifier.includes("@") ? "05321000001" : identifier,
     eposta: identifier.includes("@")
       ? identifier
@@ -225,8 +225,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(profile);
           return profile;
         }
-      } catch {
-        // verifyOtp hatası durumunda test moduna geçilir
+      } catch (err: unknown) {
+        console.warn("verifyOtp sırasında uyarı, geliştirme moduna geçiliyor:", err);
       }
     }
 
@@ -261,8 +261,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(profile);
           return profile;
         }
-      } catch {
-        // signInWithPassword hatası durumunda test moduna geçilir
+      } catch (err: unknown) {
+        console.warn("signInWithPassword sırasında uyarı, geliştirme moduna geçiliyor:", err);
       }
     }
 
@@ -438,8 +438,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ...(data.eposta !== undefined ? { eposta: data.eposta } : {}),
           })
           .eq("id", user.id);
-      } catch {
-        // Profil güncelleme hatası güvenle yutulur
+      } catch (err: unknown) {
+        console.warn("Profil güncelleme sırasında uyarı:", err);
       }
     }
   };
@@ -449,8 +449,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (supabase) {
       try {
         await supabase.auth.signOut();
-      } catch {
-        // signOut hatası güvenle yutulur
+      } catch (err: unknown) {
+        console.warn("Çıkış yapılırken uyarı:", err);
       }
     }
     setUser(null);

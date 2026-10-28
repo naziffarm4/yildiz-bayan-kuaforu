@@ -57,7 +57,7 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
         medya_turu: body.medya_turu ?? body.medyaTuru ?? "image",
         kapak_url: body.kapak_url ?? body.kapakUrl ?? null,
         aciklama: body.aciklama ?? null,
-        stilist: body.stilist ?? "Yıldız Aksoy",
+        stilist: body.stilist ?? "Yıldız Bayan Kuaförü",
       })
       .select("*")
       .single();

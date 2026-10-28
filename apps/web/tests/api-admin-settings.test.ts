@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { RouteHandler } from "../src/lib/auth/api-guard";
 
 vi.mock("@/lib/auth/api-guard", () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  withStaffOrAdminAuth: (handler: any) => handler,
+  withStaffOrAdminAuth: (handler: RouteHandler) => handler,
 }));
 
 import { GET, POST, PUT } from "../src/app/api/admin/settings/route";

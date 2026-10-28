@@ -14,6 +14,7 @@
   --color-text-secondary: #6B6B6B;   /* İkincil Açıklama Metni */
 
   --color-bg-primary: #FFFFFF;       /* Saf Beyaz */
+  --color-bg-header: #FFFFFF;        /* Saf Beyaz Menü / Header Arka Planı */
   --color-bg-secondary: #F8F9FA;     /* Lüks Açık Gri / Bej */
   --color-bg-topbar: #ff5ea5;        /* BeautyZone Canlı Pembe TopBar */
 
@@ -22,7 +23,7 @@
   --color-gold: #C9A96E;             /* İnce Altın Aksanlar */
 
   /* Geriye dönük uyumluluk değişkenleri */
-  --bg-primary: #FAF7F2;
+  --bg-primary: #FFFFFF;
   --bg-secondary: #F3EDE4;
   --accent-gold: #C9A96E;
   --accent-pink: #E8B4B8;
@@ -43,4 +44,8 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   margin: 0;
   padding: 0;
+}
+
+header {
+  background-color: var(--color-bg-header);
 }

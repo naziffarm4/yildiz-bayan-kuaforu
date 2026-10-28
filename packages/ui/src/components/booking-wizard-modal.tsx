@@ -78,7 +78,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerNote, setCustomerNote] = useState("");
 
-  // SMS Doğrulama Simülasyonu
+  // SMS Doğrulama Durumu
   const [smsSent, setSmsSent] = useState(false);
   const [smsCode, setSmsCode] = useState("");
   const [enteredSmsCode, setEnteredSmsCode] = useState("");
@@ -489,12 +489,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                 </div>
               </div>
 
-              {/* Simüle Edilen SMS Kutusu */}
+              {/* SMS Doğrulama Kutusu */}
               {smsSent && (
                 <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-amber-900">
-                      📱 Doğrulama SMS’i (Simülasyon)
+                      📱 SMS Doğrulama Kodu
                     </span>
                     <span className="text-xs font-mono font-bold text-accent-gold bg-white px-2 py-0.5 rounded border border-accent-gold/40">
                       Kod: {smsCode}

@@ -105,4 +105,23 @@ describe("Faz 3: Güvenlik Başlıkları, Görsel Optimizasyonu ve SEO Yapıland
       expect(primary.DEFAULT).toContain("<alpha-value>");
     });
   });
+
+  describe("0017 Migration İdempotent Sütun Güvencesi", () => {
+    it("0017_remove_mock_names_and_sync_admin.sql içinde gallery_items ve site_settings sütunlarını ADD COLUMN IF NOT EXISTS ile güvenceye alır", () => {
+      const migrationPath = path.resolve(
+        __dirname,
+        "../../../supabase/migrations/0017_remove_mock_names_and_sync_admin.sql",
+      );
+      const sql = fs.readFileSync(migrationPath, "utf-8");
+
+      expect(sql).toContain("ADD COLUMN IF NOT EXISTS medya_turu");
+      expect(sql).toContain("ADD COLUMN IF NOT EXISTS kapak_url");
+      expect(sql).toContain("ADD COLUMN IF NOT EXISTS aciklama");
+      expect(sql).toContain("ADD COLUMN IF NOT EXISTS stilist TEXT DEFAULT 'Yıldız Bayan Kuaförü'");
+      expect(sql).toContain("ADD COLUMN IF NOT EXISTS begeni_sayisi");
+      expect(sql).toContain("ADD COLUMN IF NOT EXISTS sayfa_metinleri JSONB DEFAULT '{}'::jsonb");
+      expect(sql).toContain("ADD COLUMN IF NOT EXISTS adres");
+      expect(sql).toContain("ADD COLUMN IF NOT EXISTS google_maps_url");
+    });
+  });
 });

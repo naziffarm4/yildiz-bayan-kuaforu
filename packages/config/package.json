@@ -1,0 +1,10 @@
+{
+  "name": "@yildiz/config",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./eslint/base.js",
+  "exports": {
+    ".": "./eslint/base.js",
+    "./*": "./*"
+  }
+}

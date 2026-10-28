@@ -1,0 +1,19 @@
+{
+  "extends": "@yildiz/config/tsconfig/nextjs.json",
+  "compilerOptions": {
+    "resolveJsonModule": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@yildiz/types": ["../../packages/types/src/index.ts"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "src/**/*",
+    "tests/**/*",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

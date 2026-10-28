@@ -1,0 +1,9 @@
+{
+  "extends": "@yildiz/config/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}

@@ -1,0 +1,9 @@
+{
+  "extends": "@yildiz/config/tsconfig/react-library.json",
+  "compilerOptions": {
+    "paths": {
+      "@yildiz/types": ["../types/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}

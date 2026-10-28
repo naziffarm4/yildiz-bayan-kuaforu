@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* BeautyZone Gerçek Renk Paleti */
+  --color-primary: #ff5ea5;          /* Canlı Kuaför Pembesi / Fuşya */
+  --color-primary-hover: #ed3d8b;    /* Koyu Pembe */
+  --color-secondary: #00becf;        /* Canlı Turkuaz */
+  --color-secondary-hover: #00a9b8;
+
+  --color-dark: #320016;             /* Lüks Derin Mürdüm / Bordo (Başlıklar) */
+  --color-text-primary: #2C2C2C;     /* Ana Metin */
+  --color-text-secondary: #6B6B6B;   /* İkincil Açıklama Metni */
+
+  --color-bg-primary: #FFFFFF;       /* Saf Beyaz */
+  --color-bg-secondary: #F8F9FA;     /* Lüks Açık Gri / Bej */
+  --color-bg-topbar: #ff5ea5;        /* BeautyZone Canlı Pembe TopBar */
+
+  --color-border: #E5E0D8;
+  --color-border-light: #F0F0F0;
+  --color-gold: #C9A96E;             /* İnce Altın Aksanlar */
+
+  /* Geriye dönük uyumluluk değişkenleri */
+  --bg-primary: #FAF7F2;
+  --bg-secondary: #F3EDE4;
+  --accent-gold: #C9A96E;
+  --accent-pink: #E8B4B8;
+  --text-primary: #2C2C2C;
+  --text-secondary: #6B6B6B;
+  --border-color: #E5E0D8;
+}
+
+/* Sticky ve Fixed pozisyonlamayı bozan overflow-x-hidden yerine overflow-x-clip */
+html, body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  margin: 0;
+  padding: 0;
+}

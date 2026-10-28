@@ -165,7 +165,8 @@ function normalizePageTextsWithAdmin(
     !currentFounder ||
     currentFounder.includes(LEGACY_ADMIN_NAME) ||
     (adminFullName &&
-      currentFounder === `${DEFAULT_SALON_BRAND} — Kurucu & Master Stilist`)
+      (currentFounder === DEFAULT_SALON_BRAND ||
+        currentFounder === `${DEFAULT_SALON_BRAND} — Kurucu & Master Stilist`))
       ? `${effectiveAdmin} — Kurucu & Master Stilist`
       : currentFounder;
 

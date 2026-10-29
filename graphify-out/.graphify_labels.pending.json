@@ -24,6 +24,7 @@
   "36": "AdminTopbar.tsx",
   "37": "ref_vitest",
   "38": "auth-context.tsx",
+  "39": "next-env.d.ts",
   "42": "PaymentService",
   "43": "AGENTS.md",
   "46": "env.ts",

@@ -356,7 +356,7 @@ export async function POST(request: Request) {
     let musteriId: string | null = null;
 
     try {
-      const serverSupabase = createClient();
+      const serverSupabase = await createClient();
       const {
         data: { user },
       } = await serverSupabase.auth.getUser();

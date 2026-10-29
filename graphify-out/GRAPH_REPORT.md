@@ -1,7 +1,7 @@
 # Graph Report - yildiz-bayan-kuaforu  (2026-10-29)
 
 ## Corpus Check
-- 226 files · ~113,205 words
+- 226 files · ~113,246 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 4 file(s) not represented in the graph (top: (none) 2, .example 1, .css 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `314639b3`
+- Built from commit: `a1126dc5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -145,7 +145,7 @@ Nodes (16): compilerOptions, esModuleInterop, forceConsistentCasingInFileNames, 
 
 ### Community 7 - "web/package.json"
 Cohesion: 0.10
-Nodes (20): dependencies, clsx@^2.1.1, next@^14.2.5, react@^18.3.1, react-dom@^18.3.1, @supabase/supabase-js@^2.118.0, tailwind-merge@^2.3.0, @yildiz/types@workspace:* (+12 more)
+Nodes (20): dependencies, clsx@^2.1.1, next@^15.5.28, react@^19.0.0, react-dom@^19.0.0, @supabase/supabase-js@^2.118.0, tailwind-merge@^2.3.0, @yildiz/types@workspace:* (+12 more)
 
 ### Community 8 - "4. Orta"
 Cohesion: 0.05
@@ -161,7 +161,7 @@ Nodes (6): collectRouteFiles(), mockEq, mockFrom, mockGetUser, mockSelect, mockS
 
 ### Community 11 - "web/package.json"
 Cohesion: 0.09
-Nodes (30): devDependencies, autoprefixer@^10.4.19, eslint-config-next@^14.2.5, eslint-config-prettier@^9.1.0, postcss@^8.4.38, tailwindcss@^3.4.4, @types/node@^20.14.0, @types/react@^18.3.3 (+22 more)
+Nodes (30): devDependencies, autoprefixer@^10.4.19, eslint-config-next@^15.5.28, eslint-config-prettier@^9.1.0, postcss@^8.4.38, tailwindcss@^3.4.4, @types/node@^22.0.0, @types/react@^19.0.0 (+22 more)
 
 ### Community 12 - "types/package.json"
 Cohesion: 0.09
@@ -344,7 +344,7 @@ Nodes (6): ToastItem, ToastState, ToastType, GetState, SetState, { channelListen
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `next` connect `Card` to `web/package.json`, `admin/page.tsx`, `api-guard.test.ts`, `web/package.json`, `3. Güvenlik Bulguları`, `sync-google-reviews/route.ts`, `ui/src/index.ts`, `getSupabaseAdmin`, `AdminTopbar.tsx`, `ref_vitest`, `Button`, `admin/appointments/route.ts`, `middleware.test.ts`, `app/layout.tsx`, `upload/route.ts`, `next`, `galeri/layout.tsx`, `hakkimizda/layout.tsx`, `randevu/layout.tsx`, `expire-appointments/route.ts`?**
-  _High betweenness centrality (0.147) - this node is a cross-community bridge._
+  _High betweenness centrality (0.149) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `getSupabaseAdmin()` (e.g. with `api-appointments.test.ts` and `Y2 – Herkese açık formlarda hız sınırı ve bot koruması yok`) actually correct?**
   _`getSupabaseAdmin()` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `@yildiz/config/tsconfig/nextjs.json`, `./base.json`, `./base.json` to the rest of the system?**

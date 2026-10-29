@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     }
 
     // Şartname Madde 18: Beğeni ve yorum için giriş zorunludur
-    const authSupabase = createClient();
+    const authSupabase = await createClient();
     const {
       data: { user },
       error: authError,

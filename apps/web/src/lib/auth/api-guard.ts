@@ -19,7 +19,7 @@ export function withRole<TContext = unknown>(
 ) {
   return async (request: Request, context?: TContext): Promise<Response> => {
     try {
-      const supabase = createClient();
+      const supabase = await createClient();
       const {
         data: { user },
         error: userError,

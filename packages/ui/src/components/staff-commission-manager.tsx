@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import type { StaffProfile, CashPayment } from "@yildiz/types";
 import { calculateCommission, generateSafeUUID } from "@yildiz/types";

@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import type { SupplierItem } from "@yildiz/types";
 import { generateSafeUUID } from "@yildiz/types";

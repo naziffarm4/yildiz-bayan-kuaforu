@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import type { GalleryItem } from "@yildiz/types";
 import { Button } from "./button";

@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useId, useEffect } from "react";
 import type {
   ServiceItem,

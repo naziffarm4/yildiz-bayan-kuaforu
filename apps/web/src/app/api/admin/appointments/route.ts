@@ -111,7 +111,7 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
 
     let actorId: string | null = null;
     try {
-      const authClient = createClient();
+      const authClient = await createClient();
       const {
         data: { user },
       } = await authClient.auth.getUser();

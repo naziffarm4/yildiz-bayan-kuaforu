@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { withStaffOrAdminAuth } from "@/lib/auth/api-guard";
+import { withAdminAuth, withStaffOrAdminAuth } from "@/lib/auth/api-guard";
+import { recordAuditLog } from "@/lib/audit-log";
 import type { Database, Json, PageTexts, SalonInfo } from "@yildiz/types";
 
 async function handleGet() {
@@ -140,6 +141,12 @@ async function handlePost(request: Request) {
         );
       }
 
+      await recordAuditLog({
+        action: "site_settings.update",
+        entityType: "site_settings",
+        entityId: existing.id,
+      });
+
       return NextResponse.json({ success: true, data });
     } else {
       const { data, error: insertError } = await supabase
@@ -164,5 +171,5 @@ async function handlePost(request: Request) {
 }
 
 export const GET = withStaffOrAdminAuth(handleGet);
-export const POST = withStaffOrAdminAuth(handlePost);
-export const PUT = withStaffOrAdminAuth(handlePost);
+export const POST = withAdminAuth(handlePost);
+export const PUT = withAdminAuth(handlePost);

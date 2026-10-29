@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  cookie: ^0.7.2
+
 importers:
 
   .:
@@ -54,7 +57,7 @@ importers:
         specifier: ^2.3.0
         version: 2.6.1
       zod:
-        specifier: ^3.23.8
+        specifier: ^3.24.2
         version: 3.25.76
       zustand:
         specifier: ^5.0.3
@@ -1124,9 +1127,9 @@ packages:
   confbox@0.1.8:
     resolution: {integrity: sha512-RMtmw0iFkeR4YV+fUOSucriAQNb9g8zFR52MWCtl+cCZOFRNL6zeB395vPzFhEjjn4fMxXudmELnl/KF/WrK6w==}
 
-  cookie@1.1.1:
-    resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
-    engines: {node: '>=18'}
+  cookie@0.7.2:
+    resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
+    engines: {node: '>= 0.6'}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -2888,7 +2891,7 @@ snapshots:
   '@supabase/ssr@0.12.7(@supabase/supabase-js@2.118.0)':
     dependencies:
       '@supabase/supabase-js': 2.118.0
-      cookie: 1.1.1
+      cookie: 0.7.2
 
   '@supabase/storage-js@2.118.0':
     dependencies:
@@ -3371,7 +3374,7 @@ snapshots:
 
   confbox@0.1.8: {}
 
-  cookie@1.1.1: {}
+  cookie@0.7.2: {}
 
   cross-spawn@7.0.6:
     dependencies:

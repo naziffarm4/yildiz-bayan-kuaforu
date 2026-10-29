@@ -1,26 +1,15 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { verifyCronRequest } from "@/lib/auth/cron-auth";
+import { safeErrorResponse } from "@/lib/api-utils";
 import { executeGoogleSync } from "@/services/google-sync.service";
 
 export async function GET(request: Request) {
   try {
-    const cronSecret = process.env.CRON_SECRET?.trim();
-    if (!cronSecret) {
-      return NextResponse.json(
-        { error: "Sunucu yapılandırma hatası: CRON_SECRET tanımlı değil." },
-        { status: 500 }
-      );
-    }
-
-    const authHeader = request.headers.get("authorization");
-    const isAuthorized = authHeader === `Bearer ${cronSecret}`;
-
-    if (!isAuthorized) {
-      return NextResponse.json(
-        { error: "Yetkisiz erişim. Geçersiz cron anahtarı." },
-        { status: 401 }
-      );
+    const auth = verifyCronRequest(request);
+    if (!auth.authorized) {
+      return auth.response;
     }
 
     const url = new URL(request.url);
@@ -34,10 +23,6 @@ export async function GET(request: Request) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Cron senkronizasyon hatası";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return safeErrorResponse(message, 500, err);
   }
-}
-
-export async function POST(request: Request) {
-  return GET(request);
 }

@@ -66,7 +66,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: () => mockSupabase,
 }));
 
-import { GET, POST } from "../src/app/api/cron/expire-appointments/route";
+import { GET } from "../src/app/api/cron/expire-appointments/route";
 
 describe("Expire Pending Appointments Cron Route (/api/cron/expire-appointments)", () => {
   beforeEach(() => {
@@ -74,7 +74,7 @@ describe("Expire Pending Appointments Cron Route (/api/cron/expire-appointments)
     updatedIds.length = 0;
   });
 
-  it("CRON_SECRET tanımlı değilse 500 hatası döner", async () => {
+  it("CRON_SECRET tanımlı değilse veya çok kısaysa 500 hatası döner", async () => {
     const orig = process.env.CRON_SECRET;
     delete process.env.CRON_SECRET;
 
@@ -88,7 +88,7 @@ describe("Expire Pending Appointments Cron Route (/api/cron/expire-appointments)
   });
 
   it("Authorization Bearer başlığı geçersizse 401 döner", async () => {
-    process.env.CRON_SECRET = "secure-cron-secret-2026";
+    process.env.CRON_SECRET = "secure-cron-secret-2026-min-16-chars";
 
     const req = new Request("http://localhost/api/cron/expire-appointments");
     const res = await GET(req);
@@ -96,13 +96,13 @@ describe("Expire Pending Appointments Cron Route (/api/cron/expire-appointments)
   });
 
   it("Geçerli CRON_SECRET ile çalışma saatlerine göre süresi dolan Beklemede randevuları 'Süresi Doldu' yapar", async () => {
-    process.env.CRON_SECRET = "secure-cron-secret-2026";
+    process.env.CRON_SECRET = "secure-cron-secret-2026-min-16-chars";
 
     const req = new Request(
       "http://localhost/api/cron/expire-appointments?now=2026-10-28T10:00:00%2B03:00",
       {
-        headers: { Authorization: "Bearer secure-cron-secret-2026" },
-      },
+        headers: { Authorization: "Bearer secure-cron-secret-2026-min-16-chars" },
+      }
     );
     const res = await GET(req);
     expect(res.status).toBe(200);
@@ -112,21 +112,5 @@ describe("Expire Pending Appointments Cron Route (/api/cron/expire-appointments)
     expect(json.expiredCount).toBe(1);
     expect(json.expiredIds).toEqual(["app-expired-1"]);
     expect(updatedIds).toEqual(["app-expired-1"]);
-  });
-
-  it("POST çağrısı da aynı süre dolumu kontrolünü çalıştırır", async () => {
-    process.env.CRON_SECRET = "secure-cron-secret-2026";
-
-    const req = new Request(
-      "http://localhost/api/cron/expire-appointments?now=2026-10-28T10:00:00%2B03:00",
-      {
-        method: "POST",
-        headers: { Authorization: "Bearer secure-cron-secret-2026" },
-      },
-    );
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.expiredCount).toBe(1);
   });
 });

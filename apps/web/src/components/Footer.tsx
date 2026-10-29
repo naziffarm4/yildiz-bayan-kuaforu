@@ -182,9 +182,13 @@ export const Footer: React.FC = () => {
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-text-secondary gap-4">
           <p>© {new Date().getFullYear()} YILDIZ BAYAN KUAFÖRÜ. Tüm Hakları Saklıdır.</p>
           <div className="flex items-center gap-4 text-[11px]">
-            <span>KVKK Aydınlatma Metni</span>
+            <Link href="/kvkk" className="hover:text-text-primary transition-colors underline">
+              KVKK Aydınlatma Metni
+            </Link>
             <span>•</span>
-            <span>Gizlilik Politikası</span>
+            <Link href="/kvkk" className="hover:text-text-primary transition-colors underline">
+              Gizlilik Politikası
+            </Link>
             <span>•</span>
             <Link href="/admin" className="text-accent-gold font-semibold hover:underline">
               Yönetim Paneli Girişi

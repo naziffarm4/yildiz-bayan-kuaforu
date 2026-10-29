@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@9.4.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "cookie": "^0.7.2"
+    }
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",

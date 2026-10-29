@@ -2,6 +2,12 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createRequire } from "module";
+
+if (process.env.NODE_ENV === "production") {
+  console.error("Bu geliştirici betiği üretim ortamında çalıştırılamaz.");
+  process.exit(1);
+}
+
 const require = createRequire(import.meta.url);
 const { createClient } = require("../apps/web/node_modules/@supabase/supabase-js");
 

@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { isPendingAppointmentExpired, type SpecialDay } from "@yildiz/types";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { verifyCronRequest } from "@/lib/auth/cron-auth";
+import { safeErrorResponse } from "@/lib/api-utils";
 import { SALON_INFO, DEFAULT_SPECIAL_DAYS } from "@/lib/site-defaults";
 
 function normalizeWorkingHours(raw: unknown): Record<string, string> {
@@ -30,45 +32,43 @@ function normalizeWorkingHours(raw: unknown): Record<string, string> {
   };
 }
 
+function extractSpecialDays(rawTexts: unknown): SpecialDay[] {
+  if (typeof rawTexts === "object" && rawTexts !== null) {
+    const obj = rawTexts as Record<string, unknown>;
+    if (Array.isArray(obj.specialDays)) {
+      return obj.specialDays as SpecialDay[];
+    }
+  }
+  return DEFAULT_SPECIAL_DAYS;
+}
+
 export async function GET(request: Request) {
   try {
-    const cronSecret = process.env.CRON_SECRET?.trim();
-    if (!cronSecret) {
-      return NextResponse.json(
-        { error: "Sunucu yapılandırma hatası: CRON_SECRET tanımlı değil." },
-        { status: 500 },
-      );
-    }
-
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { error: "Yetkisiz erişim. Geçersiz cron anahtarı." },
-        { status: 401 },
-      );
+    const auth = verifyCronRequest(request);
+    if (!auth.authorized) {
+      return auth.response;
     }
 
     const supabase = getSupabaseAdmin();
     if (!supabase) {
-      return NextResponse.json(
-        { error: "Supabase admin bağlantısı yapılandırılmamış." },
-        { status: 500 },
-      );
+      return safeErrorResponse("Supabase admin bağlantısı yapılandırılmamış.", 500);
     }
 
     const url = new URL(request.url);
-    const nowIso = url.searchParams.get("now") || new Date().toISOString();
+    const queryNow =
+      process.env.NODE_ENV !== "production" ? url.searchParams.get("now") : null;
+    const nowIso = queryNow || new Date().toISOString();
 
     const { data: settingsRow } = await supabase
       .from("site_settings")
-      .select("blokaj_sure_dakika, tampon_sure_dakika, calisma_saatleri")
+      .select("blokaj_sure_dakika, tampon_sure_dakika, calisma_saatleri, sayfa_metinleri")
       .limit(1)
       .maybeSingle();
 
     const timeoutMinutes =
       settingsRow?.blokaj_sure_dakika ?? settingsRow?.tampon_sure_dakika ?? 30;
     const workingHours = normalizeWorkingHours(settingsRow?.calisma_saatleri);
-    const specialDays: SpecialDay[] = DEFAULT_SPECIAL_DAYS;
+    const specialDays: SpecialDay[] = extractSpecialDays(settingsRow?.sayfa_metinleri);
 
     const { data: pendingRows, error: fetchError } = await supabase
       .from("appointments")
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
       .eq("durum", "Beklemede");
 
     if (fetchError) {
-      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+      return safeErrorResponse("Bekleyen randevular sorgulanamadı.", 500, fetchError);
     }
 
     const expiredIds = (pendingRows ?? [])
@@ -86,8 +86,8 @@ export async function GET(request: Request) {
           nowIso,
           timeoutMinutes,
           workingHours,
-          specialDays,
-        ),
+          specialDays
+        )
       )
       .map((row) => row.id);
 
@@ -98,7 +98,11 @@ export async function GET(request: Request) {
         .in("id", expiredIds);
 
       if (updateError) {
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
+        return safeErrorResponse(
+          "Süresi dolan randevular güncellenemedi.",
+          500,
+          updateError
+        );
       }
     }
 
@@ -111,12 +115,6 @@ export async function GET(request: Request) {
       expiredIds,
     });
   } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : "Bekleyen randevu süre dolumu kontrol hatası";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return safeErrorResponse("Bekleyen randevu süre dolumu kontrol hatası.", 500, err);
   }
-}
-
-export async function POST(request: Request) {
-  return GET(request);
 }

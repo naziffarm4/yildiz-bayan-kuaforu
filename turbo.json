@@ -1,13 +1,32 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NODE_ENV",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SITE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "CRON_SECRET",
+    "GOOGLE_PLACES_API_KEY",
+    "GOOGLE_PLACE_ID"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
-    "lint": {},
-    "type-check": {},
-    "test": {},
+    "lint": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tests/**", "*.config.*", ".eslintrc*", "tsconfig.json", "package.json"]
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tests/**", "tsconfig.json", "package.json"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tests/**", "vitest.config.*", "tsconfig.json", "package.json"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

@@ -1,9 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { withAdminAuth } from "@/lib/auth/api-guard";
 import { executeGoogleSync } from "@/services/google-sync.service";
 
-export async function POST(request: Request) {
+export const POST = withAdminAuth(async (request: Request) => {
   try {
     let force = false;
 
@@ -25,16 +26,4 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : "Bilinmeyen bir hata oluştu";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
-
-export async function GET(request: Request) {
-  try {
-    const url = new URL(request.url);
-    const force = url.searchParams.get("force") === "true";
-    const result = await executeGoogleSync(force);
-    return NextResponse.json(result);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Bilinmeyen bir hata oluştu";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+});

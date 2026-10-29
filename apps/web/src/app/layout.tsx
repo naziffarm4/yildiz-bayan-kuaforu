@@ -78,7 +78,9 @@ export default function RootLayout({
       <body>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(salonJsonLd) }}
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(salonJsonLd).replace(/</g, "\\u003c"),
+          }}
         />
         <Suspense fallback={null}>
           <NavigationProgressBar />

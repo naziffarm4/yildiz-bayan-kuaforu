@@ -1057,35 +1057,131 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
           (payload: { new?: Record<string, unknown> }) => {
             const updated = payload.new;
             if (!updated?.id) return;
-            get().bootstrapApp(true);
+
+            set((state) => {
+              const nextSalonInfo: SalonInfo = {
+                ...state.salonInfo,
+                ad: typeof updated.salon_adi === "string" && updated.salon_adi ? updated.salon_adi : state.salonInfo.ad,
+                slogan: typeof updated.slogan === "string" && updated.slogan ? updated.slogan : state.salonInfo.slogan,
+                adres: typeof updated.adres === "string" && updated.adres ? updated.adres : state.salonInfo.adres,
+                googleHaritaUrl:
+                  typeof updated.google_maps_url === "string" && updated.google_maps_url
+                    ? updated.google_maps_url
+                    : state.salonInfo.googleHaritaUrl,
+                telefon: typeof updated.telefon === "string" && updated.telefon ? updated.telefon : state.salonInfo.telefon,
+                whatsapp: typeof updated.whatsapp === "string" && updated.whatsapp ? updated.whatsapp : state.salonInfo.whatsapp,
+                instagram: typeof updated.instagram === "string" && updated.instagram ? updated.instagram : state.salonInfo.instagram,
+                tiktok: typeof updated.tiktok === "string" && updated.tiktok ? updated.tiktok : state.salonInfo.tiktok,
+                facebook: typeof updated.facebook === "string" && updated.facebook ? updated.facebook : state.salonInfo.facebook,
+                calismaSaatleri:
+                  typeof updated.calisma_saatleri === "object" && updated.calisma_saatleri !== null
+                    ? (updated.calisma_saatleri as unknown as SalonInfo["calismaSaatleri"])
+                    : state.salonInfo.calismaSaatleri,
+                varsayilanTamponSureDakika:
+                  typeof updated.tampon_sure_dakika === "number"
+                    ? updated.tampon_sure_dakika
+                    : state.salonInfo.varsayilanTamponSureDakika,
+              };
+
+              let nextPageTexts: PageTexts = state.pageTexts;
+              const rawSayfa = updated.sayfa_metinleri as Partial<PageTexts> | undefined;
+              if (rawSayfa && typeof rawSayfa === "object") {
+                nextPageTexts = {
+                  ...state.pageTexts,
+                  ...rawSayfa,
+                  hero: {
+                    ...state.pageTexts.hero,
+                    ...(rawSayfa.hero || {}),
+                    title:
+                      (typeof updated.hero_baslik === "string" && updated.hero_baslik) ||
+                      rawSayfa.hero?.title ||
+                      state.pageTexts.hero.title,
+                    description:
+                      (typeof updated.hero_aciklama === "string" && updated.hero_aciklama) ||
+                      rawSayfa.hero?.description ||
+                      state.pageTexts.hero.description,
+                  },
+                  about: {
+                    ...state.pageTexts.about,
+                    ...(rawSayfa.about || {}),
+                    storyText:
+                      (typeof updated.hakkimizda_hikaye === "string" && updated.hakkimizda_hikaye) ||
+                      rawSayfa.about?.storyText ||
+                      state.pageTexts.about.storyText,
+                  },
+                  contact: {
+                    ...state.pageTexts.contact,
+                    ...(rawSayfa.contact || {}),
+                  },
+                };
+              }
+
+              return {
+                salonInfo: nextSalonInfo,
+                pageTexts: nextPageTexts,
+              };
+            });
           },
         )
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "services" },
-          (payload: { eventType?: string; new?: Record<string, unknown> }) => {
-            if (payload.eventType === "UPDATE") {
-              const row = payload.new ?? {};
+          (payload: {
+            eventType?: string;
+            new?: Record<string, unknown>;
+            old?: Record<string, unknown>;
+          }) => {
+            if (payload.eventType === "DELETE") {
+              const deletedId = typeof payload.old?.id === "string" ? payload.old.id : "";
+              if (!deletedId) return;
               set((state) => ({
-                services: state.services.map((s) =>
-                  s.id === row.id
-                    ? {
-                        ...s,
-                        ad: typeof row.ad === "string" ? row.ad : s.ad,
-                        kategori: typeof row.kategori === "string" ? row.kategori : s.kategori,
-                        tahminiSureDakika: Number(row.tahmini_sure_dakika ?? s.tahminiSureDakika),
-                        fiyat: Number(row.fiyat ?? s.fiyat),
-                        aktif: Boolean(row.aktif ?? s.aktif),
-                        aciklama: typeof row.aciklama === "string" ? row.aciklama : s.aciklama,
-                        gorselUrl: typeof row.gorsel_url === "string" ? row.gorsel_url : s.gorselUrl,
-                        sira: Number(row.sira ?? s.sira),
-                      }
-                    : s,
-                ),
+                services: state.services.filter((s) => s.id !== deletedId),
               }));
-            } else {
-              get().bootstrapApp(true);
+              return;
             }
+
+            const row = payload.new ?? {};
+            const rowId = typeof row.id === "string" ? row.id : "";
+            if (!rowId) return;
+
+            if (payload.eventType === "INSERT") {
+              if (row.aktif === false) return;
+              const newService: ServiceItem = {
+                id: rowId,
+                ad: typeof row.ad === "string" ? row.ad : "",
+                kategori: typeof row.kategori === "string" ? row.kategori : "",
+                tahminiSureDakika: Number(row.tahmini_sure_dakika) || 30,
+                fiyat: Number(row.fiyat) || 0,
+                aktif: row.aktif !== undefined ? Boolean(row.aktif) : true,
+                aciklama: typeof row.aciklama === "string" ? row.aciklama : undefined,
+                gorselUrl: typeof row.gorsel_url === "string" ? row.gorsel_url : undefined,
+                detay: typeof row.detay === "string" ? row.detay : undefined,
+                sira: typeof row.sira === "number" ? row.sira : 0,
+              };
+              set((state) => ({
+                services: [newService, ...state.services.filter((s) => s.id !== rowId)],
+              }));
+              return;
+            }
+
+            // UPDATE
+            set((state) => ({
+              services: state.services.map((s) =>
+                s.id === rowId
+                  ? {
+                      ...s,
+                      ad: typeof row.ad === "string" ? row.ad : s.ad,
+                      kategori: typeof row.kategori === "string" ? row.kategori : s.kategori,
+                      tahminiSureDakika: Number(row.tahmini_sure_dakika ?? s.tahminiSureDakika),
+                      fiyat: Number(row.fiyat ?? s.fiyat),
+                      aktif: Boolean(row.aktif ?? s.aktif),
+                      aciklama: typeof row.aciklama === "string" ? row.aciklama : s.aciklama,
+                      gorselUrl: typeof row.gorsel_url === "string" ? row.gorsel_url : s.gorselUrl,
+                      sira: Number(row.sira ?? s.sira),
+                    }
+                  : s,
+              ),
+            }));
           },
         )
         .on(
@@ -1288,7 +1384,9 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
               }
             }
 
-            useAuthStore.getState().fetchUserAppointments();
+            if (useAuthStore.getState().user !== null) {
+              void useAuthStore.getState().fetchUserAppointments();
+            }
             if (typeof window !== "undefined") {
               window.dispatchEvent(
                 new CustomEvent("yildiz:appointments-changed", { detail: payload }),

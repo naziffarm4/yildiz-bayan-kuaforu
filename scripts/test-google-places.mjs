@@ -2,6 +2,11 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+if (process.env.NODE_ENV === "production") {
+  console.error("Bu geliştirici betiği üretim ortamında çalıştırılamaz.");
+  process.exit(1);
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

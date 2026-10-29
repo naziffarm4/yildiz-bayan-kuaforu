@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Card, Badge, PasswordInput } from "@yildiz/ui";
 import { useAuth } from "@/lib/auth-context";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 import { toast } from "@/stores/toast-store";
 import { PageLoader } from "@/components/PageLoader";
 
@@ -15,13 +16,7 @@ function RegisterForm() {
   const { registerWithEmail } = useAuth();
 
   const redirectParam = searchParams.get("redirect") || searchParams.get("next");
-  const safeRedirect =
-    redirectParam &&
-    redirectParam.startsWith("/") &&
-    !redirectParam.startsWith("//") &&
-    !redirectParam.toLowerCase().startsWith("/\\")
-      ? redirectParam
-      : null;
+  const safeRedirect = safeRedirectPath(redirectParam, undefined, "") || null;
 
   const [ad, setAd] = useState("");
   const [soyad, setSoyad] = useState("");
@@ -67,8 +62,8 @@ function RegisterForm() {
       return;
     }
 
-    if (password.length < 6) {
-      const err = "Şifreniz en az 6 karakterden oluşmalıdır.";
+    if (password.length < 8) {
+      const err = "Şifre en az 8 karakter olmalıdır.";
       setError(err);
       toast.error(err);
       return;
@@ -238,10 +233,10 @@ function RegisterForm() {
               </label>
               <PasswordInput
                 required
-                minLength={6}
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="En az 6 karakter"
+                placeholder="En az 8 karakter"
               />
             </div>
 
@@ -260,8 +255,15 @@ function RegisterForm() {
                 className="text-[11px] leading-relaxed text-text-secondary select-none cursor-pointer"
               >
                 <span className="text-text-primary font-medium">6698 sayılı KVKK</span>{" "}
-                kapsamında Kişisel Verilerin Korunması Aydınlatma Metni&apos;ni ve Açık Rıza
-                Metni&apos;ni okudum, onaylıyorum.
+                kapsamında{" "}
+                <Link
+                  href="/kvkk"
+                  target="_blank"
+                  className="text-accent-gold font-semibold underline hover:text-text-primary"
+                >
+                  Kişisel Verilerin Korunması Aydınlatma Metni ve Açık Rıza Metni
+                </Link>
+                &apos;ni okudum, onaylıyorum.
               </label>
             </div>
 

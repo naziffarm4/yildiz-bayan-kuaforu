@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  useAuth,
-  normalizePhoneNumber,
-  getDevAuthUser,
-} from "../src/lib/auth-context";
+import { useAuth, normalizePhoneNumber } from "../src/lib/auth-context";
+import { getDevAuthUser } from "./fixtures/dev-auth-user";
 
 describe("AuthContext & Auth Utilities", () => {
   describe("useAuth Hook Boundary", () => {
@@ -34,7 +31,7 @@ describe("AuthContext & Auth Utilities", () => {
     });
   });
 
-  describe("getDevAuthUser: Geliştirme Ortamı Test Kullanıcısı Belirleme", () => {
+  describe("getDevAuthUser Fixture: Test Kullanıcısı Belirleme", () => {
     it("Admin e-postası veya admin telefon numarası için Admin rolü üretir", () => {
       const adminEmailUser = getDevAuthUser("admin@yildizkuafor.com");
       expect(adminEmailUser.rol).toBe("Admin");

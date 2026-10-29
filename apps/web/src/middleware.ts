@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@yildiz/types";
-import { getSupabaseAdmin } from "./lib/supabase/admin";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -56,10 +55,7 @@ export async function middleware(request: NextRequest) {
     let userRole: string | null = null;
 
     try {
-      const adminClient = getSupabaseAdmin();
-      const dbClient = adminClient || supabase;
-
-      const { data: profile } = await dbClient
+      const { data: profile } = await supabase
         .from("profiles")
         .select("rol")
         .eq("id", user.id)

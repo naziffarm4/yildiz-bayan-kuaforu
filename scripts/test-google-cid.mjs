@@ -1,5 +1,10 @@
 import https from 'https';
 
+if (process.env.NODE_ENV === "production") {
+  console.error("Bu geliştirici betiği üretim ortamında çalıştırılamaz.");
+  process.exit(1);
+}
+
 const url = 'https://maps.google.com/?cid=8333635848754942930';
 
 fetch(url, {

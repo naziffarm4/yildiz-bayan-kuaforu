@@ -3,6 +3,8 @@ import type { RouteHandler } from "../src/lib/auth/api-guard";
 
 vi.mock("@/lib/auth/api-guard", () => ({
   withStaffOrAdminAuth: (handler: RouteHandler) => handler,
+  withAdminAuth: (handler: RouteHandler) => handler,
+  withRole: (_roles: readonly string[], handler: RouteHandler) => handler,
 }));
 
 import { GET, POST, PUT } from "../src/app/api/admin/settings/route";

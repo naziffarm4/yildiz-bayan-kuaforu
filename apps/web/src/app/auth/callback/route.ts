@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -31,8 +32,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Güvenli next parametresi yönlendirmesi (Open Redirect koruması)
-      const safeNext =
-        next && next.startsWith("/") && !next.startsWith("//") ? next : "/profil";
+      const safeNext = safeRedirectPath(next, requestUrl.origin, "/profil");
       return NextResponse.redirect(new URL(safeNext, requestUrl.origin));
     } catch {
       // Exchange veya oturum hatası durumunda hata ile giriş sayfasına yönlendir

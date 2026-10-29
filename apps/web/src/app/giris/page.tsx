@@ -6,28 +6,22 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button, Card, Badge, PasswordInput } from "@yildiz/ui";
 import { useAuth } from "@/lib/auth-context";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 import { toast } from "@/stores/toast-store";
 import { PageLoader } from "@/components/PageLoader";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const { loginWithPhone, loginWithEmail, loginWithGoogle } = useAuth();
+  const { sendPhoneOtp, loginWithPhone, loginWithEmail, loginWithGoogle } = useAuth();
 
   const redirectParam = searchParams.get("redirect") || searchParams.get("next");
-  const safeRedirect =
-    redirectParam &&
-    redirectParam.startsWith("/") &&
-    !redirectParam.startsWith("//") &&
-    !redirectParam.toLowerCase().startsWith("/\\")
-      ? redirectParam
-      : null;
+  const safeRedirect = safeRedirectPath(redirectParam, undefined, "") || null;
 
   const [authMethod, setAuthMethod] = useState<"phone" | "email">("phone");
 
   // Telefon Formu
   const [phoneNumber, setPhoneNumber] = useState("");
   const [smsSent, setSmsSent] = useState(false);
-  const [smsCode, setSmsCode] = useState("");
   const [enteredSmsCode, setEnteredSmsCode] = useState("");
 
   // E-posta Formu
@@ -56,31 +50,35 @@ function LoginForm() {
     }
   };
 
-  const handleSendOtp = () => {
-    if (phoneNumber.replace(/\D/g, "").length < 10) {
-      const err = "Lütfen geçerli bir telefon numarası giriniz.";
+  const handleSendOtp = async () => {
+    setError(null);
+    setLoading(true);
+    const result = await sendPhoneOtp(phoneNumber);
+    setLoading(false);
+
+    if (!result.success) {
+      const err = result.error || "SMS doğrulama kodu gönderilemedi.";
       setError(err);
       toast.error(err);
       return;
     }
-    setError(null);
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
-    setSmsCode(code);
+
     setSmsSent(true);
     toast.info("SMS doğrulama kodu gönderildi.");
   };
 
   const handlePhoneLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (enteredSmsCode !== smsCode) {
-      const err = "Girdiğiniz SMS doğrulama kodu hatalı.";
+    const cleanCode = enteredSmsCode.trim();
+    if (cleanCode.length < 4 || cleanCode.length > 6) {
+      const err = "Lütfen telefonunuza gönderilen doğrulama kodunu giriniz.";
       setError(err);
       toast.error(err);
       return;
     }
     setError(null);
     setLoading(true);
-    const loggedUser = await loginWithPhone(phoneNumber, enteredSmsCode);
+    const loggedUser = await loginWithPhone(phoneNumber, cleanCode);
     setLoading(false);
     if (loggedUser) {
       toast.success("Giriş başarılı! Yönlendiriliyorsunuz...");
@@ -258,32 +256,20 @@ function LoginForm() {
 
             {smsSent && (
               <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-amber-900">
-                    Doğrulama Kodu:
-                  </span>
-                  <Badge variant="gold" className="font-mono font-bold">
-                    {smsCode}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    maxLength={4}
-                    required
-                    value={enteredSmsCode}
-                    onChange={(e) => setEnteredSmsCode(e.target.value)}
-                    placeholder="4 Haneli Kod"
-                    className="w-32 px-3 py-1.5 border border-amber-300 rounded-md text-sm text-center font-mono font-bold bg-white text-text-primary"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEnteredSmsCode(smsCode)}
-                    className="text-[11px] text-accent-gold underline hover:text-accent-gold-hover font-medium"
-                  >
-                    (Otomatik Doldur)
-                  </button>
-                </div>
+                <label className="block text-[11px] font-bold text-amber-900">
+                  SMS Doğrulama Kodu
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  minLength={4}
+                  maxLength={6}
+                  required
+                  value={enteredSmsCode}
+                  onChange={(e) => setEnteredSmsCode(e.target.value)}
+                  placeholder="6 Haneli Kod"
+                  className="w-full px-3 py-1.5 border border-amber-300 rounded-md text-sm text-center font-mono font-bold bg-white text-text-primary"
+                />
               </div>
             )}
 
@@ -291,7 +277,7 @@ function LoginForm() {
               type="submit"
               variant="primary"
               size="md"
-              disabled={!smsSent || enteredSmsCode.length !== 4 || loading}
+              disabled={!smsSent || enteredSmsCode.trim().length < 4 || loading}
               className="w-full text-xs font-bold h-11"
             >
               {loading ? "Giriş yapılıyor..." : "Giriş Yap →"}

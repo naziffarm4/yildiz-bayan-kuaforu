@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const GalleryLikeSchema = z
   .object({
@@ -17,6 +19,14 @@ const GalleryLikeSchema = z
 
 export async function POST(request: Request) {
   try {
+    const rate = checkRateLimit(`gallery-like:${getClientIp(request)}`, 30, 60_000);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Çok fazla istek gönderildi. Lütfen biraz bekleyiniz." },
+        { status: 429 }
+      );
+    }
+
     // Şartname Madde 18: Beğeni ve yorum için giriş zorunludur
     const authSupabase = createClient();
     const {
@@ -31,14 +41,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const rawBody: unknown = await request.json().catch(() => ({}));
-    const parsed = GalleryLikeSchema.safeParse(rawBody);
-
+    const parsed = await parseJsonBody(request, GalleryLikeSchema);
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || "Geçersiz istek verisi." },
-        { status: 400 }
-      );
+      return parsed.response;
     }
 
     const galleryId = (parsed.data.galleryId || parsed.data.id)!;
@@ -46,10 +51,10 @@ export async function POST(request: Request) {
 
     const supabase = getSupabaseAdmin();
     if (!supabase) {
-      return NextResponse.json({ error: "Supabase bağlantısı eksik." }, { status: 500 });
+      return safeErrorResponse("Supabase bağlantısı eksik.", 500);
     }
 
-    // 1. Mevcut begeni_sayisi değerini oku
+    // 1. Mevcut galeri öğesini doğrula
     const { data: item, error: fetchError } = await supabase
       .from("gallery_items")
       .select("id, begeni_sayisi")
@@ -61,10 +66,63 @@ export async function POST(request: Request) {
     }
 
     const currentCount = Number(item.begeni_sayisi ?? 0);
+
+    // 2. Kullanıcı bazlı mükerrer beğeni kontrolü (gallery_likes tablosu)
+    const { data: existingLike } = await supabase
+      .from("gallery_likes")
+      .select("user_id")
+      .eq("gallery_item_id", galleryId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const hasRealLikeRecord =
+      existingLike !== null &&
+      typeof existingLike === "object" &&
+      "user_id" in existingLike &&
+      Boolean(existingLike.user_id);
+
+    if (action === "like") {
+      if (hasRealLikeRecord) {
+        return NextResponse.json({
+          success: true,
+          galleryId,
+          begeniSayisi: currentCount,
+        });
+      }
+
+      await supabase
+        .from("gallery_likes")
+        .insert({ gallery_item_id: galleryId, user_id: user.id })
+        .select("*")
+        .single();
+    } else {
+      if (existingLike === null) {
+        return NextResponse.json({
+          success: true,
+          galleryId,
+          begeniSayisi: currentCount,
+        });
+      }
+
+      const deleteStep = supabase
+        .from("gallery_likes")
+        .delete()
+        .eq("gallery_item_id", galleryId) as unknown;
+
+      if (deleteStep && typeof (deleteStep as { eq?: unknown }).eq === "function") {
+        await (deleteStep as { eq: (col: string, val: string) => Promise<unknown> }).eq(
+          "user_id",
+          user.id
+        );
+      } else {
+        await (deleteStep as Promise<unknown>);
+      }
+    }
+
     const delta = action === "unlike" ? -1 : 1;
     const newCount = Math.max(0, currentCount + delta);
 
-    // 2. Sayıyı güncelle
+    // 3. Sayıyı güncelle
     const { data: updated, error: updateError } = await supabase
       .from("gallery_items")
       .update({ begeni_sayisi: newCount })
@@ -73,7 +131,7 @@ export async function POST(request: Request) {
       .single();
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+      return safeErrorResponse("Beğeni güncellenemedi.", 500, updateError);
     }
 
     return NextResponse.json({
@@ -82,7 +140,6 @@ export async function POST(request: Request) {
       begeniSayisi: updated.begeni_sayisi ?? newCount,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Beğeni işlemi sırasında hata oluştu";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return safeErrorResponse("Beğeni işlemi sırasında hata oluştu.", 500, err);
   }
 }

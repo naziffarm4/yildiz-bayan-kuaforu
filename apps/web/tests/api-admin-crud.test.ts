@@ -26,6 +26,8 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/auth/api-guard", () => ({
   withStaffOrAdminAuth: (handler: RouteHandler) => handler,
+  withAdminAuth: (handler: RouteHandler) => handler,
+  withRole: (_roles: readonly string[], handler: RouteHandler) => handler,
 }));
 
 interface MockQueryChain extends Promise<{ data: Array<{ id: string; begeni_sayisi: number }>; error: null }> {
@@ -96,8 +98,16 @@ import { POST as GalleryLikePOST } from "../src/app/api/gallery/like/route";
 import { GET as GalleryCommentsGET, POST as GalleryCommentsPOST } from "../src/app/api/gallery/comments/route";
 import { POST as PublicReviewPOST } from "../src/app/api/reviews/route";
 import { POST as AdminUploadPOST } from "../src/app/api/admin/upload/route";
+import { resetRateLimiter } from "../src/lib/rate-limit";
 
 describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () => {
+  beforeEach(() => {
+    resetRateLimiter();
+    mockAuthGetUser.mockResolvedValue({
+      data: { user: { id: "auth-user-123" } },
+      error: null,
+    });
+  });
   describe("Google Metinsiz Puanlama (CustomerReviewSchema)", () => {
     it("yorum metni olmadan yalnızca yıldız puanı ile CustomerReview şeması geçerlidir", () => {
       const reviewWithoutText = {
@@ -245,6 +255,21 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       const res = await ServicesPATCH(req);
       expect(res.status).toBe(200);
     });
+
+    it("POST negatif fiyat veya negatif süre değerini 400 ile reddeder (G-09)", async () => {
+      const req = new Request("http://localhost/api/admin/services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ad: "Negatif Hizmet",
+          kategori: "Saç Tasarımı",
+          tahminiSureDakika: 45,
+          fiyat: -100,
+        }),
+      });
+      const res = await ServicesPOST(req);
+      expect(res.status).toBe(400);
+    });
   });
 
   describe("Inventory API (/api/admin/inventory)", () => {
@@ -359,9 +384,18 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
   });
 
   describe("Appointments API (/api/admin/appointments)", () => {
-    it("GET randevuları getirir", async () => {
-      const res = await AppointmentsGET(new Request("http://localhost/api/admin/appointments"));
+    it("GET randevuları ve pagination meta bilgisini getirir (P-03)", async () => {
+      const res = await AppointmentsGET(
+        new Request("http://localhost/api/admin/appointments?limit=50&offset=10")
+      );
       expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.pagination).toEqual({
+        limit: 50,
+        offset: 10,
+        count: expect.any(Number),
+      });
     });
 
     it("PATCH id eksikse 400 döner", async () => {
@@ -384,6 +418,17 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
 
       const res = await AppointmentsPATCH(req);
       expect(res.status).toBe(200);
+    });
+
+    it("PATCH geçersiz durum enum değerini 400 ile reddeder (G-09)", async () => {
+      const req = new Request("http://localhost/api/admin/appointments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "test-app-id", durum: "GecersizDurum" }),
+      });
+
+      const res = await AppointmentsPATCH(req);
+      expect(res.status).toBe(400);
     });
 
     it("DELETE id eksikse 400 döner", async () => {
@@ -634,6 +679,26 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
         envRecord.NODE_ENV = origEnv;
       }
     });
+
+    it("magic byte imzası beyan edilen MIME türüyle uyuşmayan dosyayı 400 ile reddeder (G-10)", async () => {
+      const fakePngBytes = new Uint8Array(16).fill(0x41); // 'AAAA...' — geçerli PNG imzası değil
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File([fakePngBytes], "spoofed.png", { type: "image/png" })
+      );
+      formData.append("folder", "gallery");
+
+      const req = new Request("http://localhost/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const res = await AdminUploadPOST(req);
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toContain("Dosya içeriği");
+    });
   });
 
   describe("Gallery Comments API (/api/gallery/comments)", () => {
@@ -663,6 +728,26 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       const json = await res.json();
       expect(json.success).toBe(true);
       expect(Array.isArray(json.data)).toBe(true);
+    });
+
+    it("POST oturumsuz kullanıcıya 401 döner (G-05 / Şartname Madde 18)", async () => {
+      mockAuthGetUser.mockResolvedValueOnce({
+        data: { user: null },
+        error: null,
+      });
+
+      const req = new Request("http://localhost/api/gallery/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          galleryId: "test-gallery-id",
+          musteriAdi: "Deniz Yılmaz",
+          yorum: "Harika!",
+        }),
+      });
+
+      const res = await GalleryCommentsPOST(req);
+      expect(res.status).toBe(401);
     });
 
     it("POST eksik parametrelerle 400 döner", async () => {
@@ -771,6 +856,42 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
 
       const res = await PublicReviewPOST(req);
       expect(res.status).toBe(400);
+    });
+
+    it("POST hız sınırını (rate limit) aşan isteklerde 429 döner (G-05)", async () => {
+      for (let i = 0; i < 10; i += 1) {
+        await PublicReviewPOST(
+          new Request("http://localhost/api/reviews", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-forwarded-for": "203.0.113.55",
+            },
+            body: JSON.stringify({
+              musteri_adi: "Selin Doğan",
+              puan: 5,
+              yorum: "Test",
+            }),
+          })
+        );
+      }
+
+      const blockedRes = await PublicReviewPOST(
+        new Request("http://localhost/api/reviews", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-forwarded-for": "203.0.113.55",
+          },
+          body: JSON.stringify({
+            musteri_adi: "Selin Doğan",
+            puan: 5,
+            yorum: "Spam",
+          }),
+        })
+      );
+
+      expect(blockedRes.status).toBe(429);
     });
   });
 });

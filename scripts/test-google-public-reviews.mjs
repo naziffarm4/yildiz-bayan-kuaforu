@@ -1,3 +1,8 @@
+if (process.env.NODE_ENV === "production") {
+  console.error("Bu geliştirici betiği üretim ortamında çalıştırılamaz.");
+  process.exit(1);
+}
+
 const cid = '8333635848754942930';
 const url = `https://www.google.com/maps/preview/review/listentitiesreviews?authuser=0&hl=tr&gl=tr&pb=!1m2!1y${cid}!2m2!1i10!2i0!3e1`;
 

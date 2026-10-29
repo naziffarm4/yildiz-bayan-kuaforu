@@ -468,6 +468,24 @@ export interface Database {
         };
         Relationships: [];
       };
+      gallery_likes: {
+        Row: {
+          gallery_item_id: string;
+          user_id: string;
+          olusturulma_tarihi: string;
+        };
+        Insert: {
+          gallery_item_id: string;
+          user_id: string;
+          olusturulma_tarihi?: string;
+        };
+        Update: {
+          gallery_item_id?: string;
+          user_id?: string;
+          olusturulma_tarihi?: string;
+        };
+        Relationships: [];
+      };
       customer_reviews: {
         Row: {
           id: string;
@@ -504,6 +522,42 @@ export interface Database {
           google_review_url?: string | null;
           randevu_id?: string | null;
           kaynak?: string;
+        };
+        Relationships: [];
+      };
+      audit_logs: {
+        Row: {
+          id: string;
+          actor_id: string | null;
+          actor_role: string | null;
+          action: string;
+          entity_type: string;
+          entity_id: string | null;
+          metadata: Json;
+          ip_address: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_id?: string | null;
+          actor_role?: string | null;
+          action: string;
+          entity_type: string;
+          entity_id?: string | null;
+          metadata?: Json;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          actor_id?: string | null;
+          actor_role?: string | null;
+          action?: string;
+          entity_type?: string;
+          entity_id?: string | null;
+          metadata?: Json;
+          ip_address?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };

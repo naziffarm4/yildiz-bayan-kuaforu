@@ -2,17 +2,18 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { withStaffOrAdminAuth } from "@/lib/auth/api-guard";
+import { withAdminAuth, withStaffOrAdminAuth } from "@/lib/auth/api-guard";
+import { safeErrorResponse } from "@/lib/api-utils";
 
 export const GET = withStaffOrAdminAuth(async (request: Request) => {
   try {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
-      return NextResponse.json({ error: "Supabase bağlantısı eksik." }, { status: 500 });
+      return safeErrorResponse("Supabase bağlantısı eksik.", 500);
     }
 
     const url = new URL(request.url);
-    const galleryId = url.searchParams.get("galleryId");
+    const galleryId = url.searchParams.get("galleryId")?.trim();
 
     let query = supabase
       .from("gallery_comments")
@@ -26,7 +27,7 @@ export const GET = withStaffOrAdminAuth(async (request: Request) => {
     const { data, error } = await query;
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return safeErrorResponse("Yorumlar getirilemedi.", 500, error);
     }
 
     return NextResponse.json({
@@ -34,23 +35,24 @@ export const GET = withStaffOrAdminAuth(async (request: Request) => {
       data: data ?? [],
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Yorumlar getirilemedi";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return safeErrorResponse("Yorumlar getirilemedi.", 500, err);
   }
 });
 
-export const DELETE = withStaffOrAdminAuth(async (request: Request) => {
+export const DELETE = withAdminAuth(async (request: Request) => {
   try {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
-      return NextResponse.json({ error: "Supabase bağlantısı eksik." }, { status: 500 });
+      return safeErrorResponse("Supabase bağlantısı eksik.", 500);
     }
 
     const url = new URL(request.url);
-    let id = url.searchParams.get("id");
+    let id = url.searchParams.get("id")?.trim() || null;
     if (!id) {
-      const body = await request.json().catch(() => ({}));
-      id = body?.id;
+      const body = (await request.json().catch(() => ({}))) as { id?: unknown };
+      if (typeof body?.id === "string" && body.id.trim()) {
+        id = body.id.trim();
+      }
     }
 
     if (!id) {
@@ -60,7 +62,7 @@ export const DELETE = withStaffOrAdminAuth(async (request: Request) => {
     const { error } = await supabase.from("gallery_comments").delete().eq("id", id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return safeErrorResponse("Yorum silinemedi.", 500, error);
     }
 
     return NextResponse.json({
@@ -68,7 +70,6 @@ export const DELETE = withStaffOrAdminAuth(async (request: Request) => {
       message: "Yorum başarıyla silindi.",
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Yorum silinemedi";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return safeErrorResponse("Yorum silinemedi.", 500, err);
   }
 });

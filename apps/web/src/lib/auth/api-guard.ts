@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export type AllowedRole = "Admin" | "Calisan";
+
 export type RouteHandler<TContext = unknown> = (
   request: Request,
   context?: TContext
 ) => Promise<Response> | Response;
 
 /**
- * Admin ve Personel (Çalışan) Rota Koruma Koruması (API Guard)
+ * Rol Bazlı Rota Koruma Koruması (API Guard)
  * createClient() (SSR) ile oturumdaki kullanıcıyı ve public.profiles rolünü doğrular.
- * Oturum yoksa 401, rolü Admin veya Calisan değilse 403 'Yetkisiz erişim' yanıtı döner.
+ * Oturum yoksa 401, rolü allowedRoles içinde değilse 403 'Yetkisiz erişim' yanıtı döner.
  */
-export function withStaffOrAdminAuth<TContext = unknown>(
-  handler: (request: Request, context?: TContext) => Promise<Response> | Response
+export function withRole<TContext = unknown>(
+  allowedRoles: readonly AllowedRole[],
+  handler: RouteHandler<TContext>
 ) {
   return async (request: Request, context?: TContext): Promise<Response> => {
     try {
@@ -35,7 +38,7 @@ export function withStaffOrAdminAuth<TContext = unknown>(
       if (
         profileError ||
         !profile ||
-        (profile.rol !== "Admin" && profile.rol !== "Calisan")
+        !allowedRoles.includes(profile.rol as AllowedRole)
       ) {
         return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
       }
@@ -47,4 +50,20 @@ export function withStaffOrAdminAuth<TContext = unknown>(
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
     }
   };
+}
+
+/**
+ * Yalnızca Admin Rolü İçin Rota Koruması
+ */
+export function withAdminAuth<TContext = unknown>(handler: RouteHandler<TContext>) {
+  return withRole(["Admin"], handler);
+}
+
+/**
+ * Admin ve Personel (Çalışan) Rota Koruması
+ */
+export function withStaffOrAdminAuth<TContext = unknown>(
+  handler: RouteHandler<TContext>
+) {
+  return withRole(["Admin", "Calisan"], handler);
 }

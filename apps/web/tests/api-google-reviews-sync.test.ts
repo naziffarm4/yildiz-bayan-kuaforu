@@ -1,27 +1,73 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { POST as AdminSyncPOST, GET as AdminSyncGET } from "../src/app/api/admin/sync/google-reviews/route";
-import { POST as CronSyncPOST, GET as CronSyncGET } from "../src/app/api/cron/sync-google-reviews/route";
+
+const { mockGetUser, mockMaybeSingle } = vi.hoisted(() => ({
+  mockGetUser: vi.fn(),
+  mockMaybeSingle: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: () => ({
+    auth: {
+      getUser: mockGetUser,
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: mockMaybeSingle,
+        }),
+      }),
+    }),
+  }),
+}));
+
+import { POST as AdminSyncPOST } from "../src/app/api/admin/sync/google-reviews/route";
+import { GET as CronSyncGET } from "../src/app/api/cron/sync-google-reviews/route";
 
 describe("Google Reviews Sync API Routes", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "admin-1", email: "admin@yildizkuafor.com" } },
+      error: null,
+    });
+    mockMaybeSingle.mockResolvedValue({
+      data: { rol: "Admin" },
+      error: null,
+    });
   });
 
   describe("Admin Sync Route (/api/admin/sync/google-reviews)", () => {
-    it("GET çağrısı Kota Koruma ve senkronizasyon mantığını çalıştırır", async () => {
-      const req = new Request("http://localhost/api/admin/sync/google-reviews");
-      const res = await AdminSyncGET(req);
-      expect(res).toBeDefined();
-      expect([200, 500]).toContain(res.status);
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 200) {
-        expect(data.success).toBe(true);
-        expect(data.data.googleRating).toBeDefined();
-        expect(data.data.googleReviewCount).toBeDefined();
-      }
+    it("Oturumsuz çağrıda 401 Yetkisiz erişim döner (G-02)", async () => {
+      mockGetUser.mockResolvedValueOnce({
+        data: { user: null },
+        error: new Error("No session"),
+      });
+
+      const req = new Request("http://localhost/api/admin/sync/google-reviews", {
+        method: "POST",
+      });
+      const res = await AdminSyncPOST(req);
+      expect(res.status).toBe(401);
+      const json = await res.json();
+      expect(json.error).toBe("Yetkisiz erişim");
     });
 
-    it("POST çağrısı force=true parametresi ile zorunlu senkronizasyon yapar", async () => {
+    it("Çalışan (Calisan) rolü ile çağrıda 403 Yetkisiz erişim döner (G-02 / G-08)", async () => {
+      mockMaybeSingle.mockResolvedValueOnce({
+        data: { rol: "Calisan" },
+        error: null,
+      });
+
+      const req = new Request("http://localhost/api/admin/sync/google-reviews", {
+        method: "POST",
+      });
+      const res = await AdminSyncPOST(req);
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error).toBe("Yetkisiz erişim");
+    });
+
+    it("Admin oturumu ile POST çağrısı force=true parametresiyle senkronizasyon yapar", async () => {
       const req = new Request("http://localhost/api/admin/sync/google-reviews?force=true", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,18 +143,6 @@ describe("Google Reviews Sync API Routes", () => {
         const json = await res.json();
         expect(json.cron).toBe(true);
       }
-    });
-
-    it("POST çağrısı GET metodunu tetikler", async () => {
-      process.env.CRON_SECRET = "test-secure-cron-secret-key-2026-min32";
-      const req = new Request("http://localhost/api/cron/sync-google-reviews", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.CRON_SECRET}`,
-        },
-      });
-      const res = await CronSyncPOST(req);
-      expect([200, 500]).toContain(res.status);
     });
   });
 });

@@ -15,10 +15,65 @@ export interface AuthState {
   setLoading: (isLoading: boolean) => void;
   initAuth: () => Promise<void>;
   fetchUserAppointments: () => Promise<void>;
+  sendPhoneOtp: (phone: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithPhone: (phone: string, code: string) => Promise<AuthUser | null>;
+  loginWithEmail: (email: string, pass: string) => Promise<AuthUser | null>;
+  registerWithEmail: (
+    ad: string,
+    soyad: string,
+    telefon: string,
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string; user?: AuthUser | null }>;
+  loginWithGoogle: (redirectToPath?: string) => Promise<{ user?: AuthUser | null; error?: string }>;
   updateProfile: (patch: Partial<AuthUser>) => Promise<{ success: boolean; error?: string }>;
   updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
-  loginWithGoogle: (redirectToPath?: string) => Promise<{ user?: AuthUser | null; error?: string }>;
   logout: () => Promise<void>;
+}
+
+export async function fetchUserProfile(
+  client: ReturnType<typeof createClient>,
+  userId: string,
+  email?: string,
+  userMetadata?: Record<string, unknown>
+): Promise<AuthUser | null> {
+  try {
+    const { data: profile, error } = await client
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!error && profile) {
+      return {
+        id: profile.id,
+        ad: profile.ad || "Kullanıcı",
+        soyad: profile.soyad || "",
+        telefon: profile.telefon || "",
+        eposta: profile.eposta || email || undefined,
+        rol: (profile.rol as "Musteri" | "Calisan" | "Admin") || "Musteri",
+        toplamPuan: profile.toplam_puan ?? 0,
+        smsDogrulandi: Boolean(profile.sms_dogrulandi),
+      };
+    }
+
+    const meta = userMetadata || {};
+    const fullName = (meta.name as string) || (meta.full_name as string) || "";
+    const nameParts = fullName ? fullName.split(" ") : [];
+
+    return {
+      id: userId,
+      ad: (meta.ad as string) || (meta.first_name as string) || nameParts[0] || "Kullanıcı",
+      soyad: (meta.soyad as string) || (meta.last_name as string) || nameParts.slice(1).join(" ") || "",
+      telefon: (meta.telefon as string) || (meta.phone as string) || "",
+      eposta: email,
+      rol: "Musteri",
+      toplamPuan: 0,
+      smsDogrulandi: false,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -64,33 +119,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         session.user.identities?.some((id) => id.provider === "google") ||
         false;
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      const authUser: AuthUser = profile
-        ? {
-            id: profile.id,
-            ad: profile.ad || "Kullanıcı",
-            soyad: profile.soyad || "",
-            telefon: profile.telefon || "",
-            eposta: profile.eposta || session.user.email || undefined,
-            rol: (profile.rol as "Musteri" | "Calisan" | "Admin") || "Musteri",
-            toplamPuan: profile.toplam_puan ?? 0,
-            smsDogrulandi: Boolean(profile.sms_dogrulandi),
-          }
-        : {
-            id: session.user.id,
-            ad: (session.user.user_metadata?.ad as string) || "Kullanıcı",
-            soyad: (session.user.user_metadata?.soyad as string) || "",
-            telefon: (session.user.user_metadata?.telefon as string) || "",
-            eposta: session.user.email,
-            rol: "Musteri",
-            toplamPuan: 0,
-            smsDogrulandi: false,
-          };
+      const authUser = await fetchUserProfile(
+        supabase,
+        session.user.id,
+        session.user.email,
+        session.user.user_metadata
+      );
 
       set({ user: authUser, isLoading: false, isGoogleUser: isGoogle });
       await get().fetchUserAppointments();
@@ -140,6 +174,143 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ appointments: [] });
   },
 
+  sendPhoneOtp: async (phone: string) => {
+    const formattedPhone = normalizePhoneNumber(phone);
+    if (!/^\+905\d{9}$/.test(formattedPhone)) {
+      return { success: false, error: "Lütfen geçerli bir telefon numarası giriniz." };
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: formattedPhone,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "SMS doğrulama kodu gönderilemedi.";
+      return { success: false, error: msg };
+    }
+  },
+
+  loginWithPhone: async (phone: string, code: string): Promise<AuthUser | null> => {
+    if (!phone || !code) return null;
+
+    const formattedPhone = normalizePhoneNumber(phone);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token: code,
+        type: "sms",
+      });
+
+      if (!error && data?.user) {
+        const profile = await fetchUserProfile(
+          supabase,
+          data.user.id,
+          data.user.email,
+          data.user.user_metadata
+        );
+        get().setUser(profile, false);
+        return profile;
+      }
+    } catch {
+      // Hata durumunda sahte kullanıcı üretilmez
+    }
+
+    return null;
+  },
+
+  loginWithEmail: async (email: string, pass: string): Promise<AuthUser | null> => {
+    if (!email || !pass) return null;
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: pass,
+      });
+
+      if (!error && data?.user) {
+        const profile = await fetchUserProfile(
+          supabase,
+          data.user.id,
+          data.user.email,
+          data.user.user_metadata
+        );
+        get().setUser(profile, false);
+        return profile;
+      }
+    } catch {
+      // Hata durumunda sahte kullanıcı üretilmez
+    }
+
+    return null;
+  },
+
+  registerWithEmail: async (
+    ad: string,
+    soyad: string,
+    telefon: string,
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string; user?: AuthUser | null }> => {
+    if (!ad || !soyad || !telefon || !email || !password) {
+      return { success: false, error: "Lütfen tüm alanları doldurunuz." };
+    }
+
+    if (password.length < 8) {
+      return { success: false, error: "Şifre en az 8 karakter olmalıdır." };
+    }
+
+    const formattedPhone = normalizePhoneNumber(telefon);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            ad,
+            soyad,
+            telefon: formattedPhone || telefon,
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data?.user) {
+        const profile = await fetchUserProfile(
+          supabase,
+          data.user.id,
+          data.user.email,
+          data.user.user_metadata
+        );
+        if (data.session) {
+          get().setUser(profile, false);
+        }
+        return { success: true, user: profile };
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Kayıt sırasında bir hata oluştu.";
+      return { success: false, error: message };
+    }
+
+    return { success: false, error: "Kayıt işlemi gerçekleştirilemedi." };
+  },
+
   updateProfile: async (patch: Partial<AuthUser>) => {
     const currentUser = get().user;
     if (!currentUser) {
@@ -165,29 +336,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .update({
           ...(patch.ad !== undefined ? { ad: patch.ad } : {}),
           ...(patch.soyad !== undefined ? { soyad: patch.soyad } : {}),
-          ...(patch.telefon !== undefined ? { telefon: updatedUser.telefon } : {}),
           ...(patch.eposta !== undefined ? { eposta: patch.eposta } : {}),
         })
         .eq("id", currentUser.id);
 
       if (error) {
-        if (process.env.NODE_ENV === "production") {
-          return { success: false, error: error.message };
-        }
+        return { success: false, error: error.message };
       }
     } catch (err: unknown) {
-      if (process.env.NODE_ENV === "production") {
-        const msg = err instanceof Error ? err.message : "Profil güncellenemedi.";
-        return { success: false, error: msg };
-      }
+      const msg = err instanceof Error ? err.message : "Profil güncellenemedi.";
+      return { success: false, error: msg };
     }
 
     return { success: true };
   },
 
   updatePassword: async (newPassword: string) => {
-    if (!newPassword || newPassword.length < 6) {
-      return { success: false, error: "Şifre en az 6 karakter olmalıdır." };
+    if (!newPassword || newPassword.length < 8) {
+      return { success: false, error: "Şifre en az 8 karakter olmalıdır." };
     }
 
     try {
@@ -199,9 +365,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return { success: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Şifre güncellenirken bir hata oluştu.";
-      if (process.env.NODE_ENV !== "production") {
-        return { success: true };
-      }
       return { success: false, error: msg };
     }
   },

@@ -6,6 +6,11 @@ const mockFrom = vi.fn();
 const mockSignOut = vi.fn();
 const mockUpdateUser = vi.fn();
 const mockGetSession = vi.fn();
+const mockSignInWithOtp = vi.fn();
+const mockVerifyOtp = vi.fn();
+const mockSignInWithPassword = vi.fn();
+const mockSignUp = vi.fn();
+const mockSignInWithOAuth = vi.fn();
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
@@ -14,11 +19,16 @@ vi.mock("@/lib/supabase/client", () => ({
       signOut: mockSignOut,
       updateUser: mockUpdateUser,
       getSession: mockGetSession,
+      signInWithOtp: mockSignInWithOtp,
+      verifyOtp: mockVerifyOtp,
+      signInWithPassword: mockSignInWithPassword,
+      signUp: mockSignUp,
+      signInWithOAuth: mockSignInWithOAuth,
     },
   }),
 }));
 
-describe("Zustand useAuthStore Mimarisi", () => {
+describe("Zustand useAuthStore Mimarisi (Single Source of Truth)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useAuthStore.setState({
@@ -55,7 +65,7 @@ describe("Zustand useAuthStore Mimarisi", () => {
     expect(state.isLoading).toBe(false);
   });
 
-  it("updateProfile optimistik olarak Zustand store'daki kullanıcıyı anında günceller", async () => {
+  it("updateProfile optimistik olarak Zustand store'daki kullanıcıyı anında günceller ve DB'ye yalnızca ad/soyad/eposta gönderir", async () => {
     const initialUser: AuthUser = {
       id: "u-123",
       ad: "Gizem",
@@ -83,6 +93,7 @@ describe("Zustand useAuthStore Mimarisi", () => {
     expect(updated?.ad).toBe("Gizem Nur");
     expect(updated?.telefon).toBe("+905329998877");
     expect(mockFrom).toHaveBeenCalledWith("profiles");
+    expect(mockUpdate).toHaveBeenCalledWith({ ad: "Gizem Nur" });
   });
 
   it("0599 ile başlayan geçici OAuth telefonu tespit edilir", () => {
@@ -104,10 +115,10 @@ describe("Zustand useAuthStore Mimarisi", () => {
     expect(isTempPhone).toBe(true);
   });
 
-  it("updatePassword 6 karakterden kısa şifreleri reddeder", async () => {
-    const result = await useAuthStore.getState().updatePassword("12345");
+  it("updatePassword 8 karakterden kısa şifreleri reddeder (G-14)", async () => {
+    const result = await useAuthStore.getState().updatePassword("1234567");
     expect(result.success).toBe(false);
-    expect(result.error).toContain("en az 6 karakter");
+    expect(result.error).toContain("en az 8 karakter");
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
@@ -117,6 +128,70 @@ describe("Zustand useAuthStore Mimarisi", () => {
     const result = await useAuthStore.getState().updatePassword("YeniSifre123!");
     expect(result.success).toBe(true);
     expect(mockUpdateUser).toHaveBeenCalledWith({ password: "YeniSifre123!" });
+  });
+
+  it("sendPhoneOtp geçerli Türkiye mobil numarasıyla supabase.auth.signInWithOtp çağırır (G-04)", async () => {
+    mockSignInWithOtp.mockResolvedValue({ data: {}, error: null });
+
+    const result = await useAuthStore.getState().sendPhoneOtp("0532 100 00 01");
+    expect(result.success).toBe(true);
+    expect(mockSignInWithOtp).toHaveBeenCalledWith({
+      phone: "+905321000001",
+    });
+  });
+
+  it("sendPhoneOtp geçersiz telefon numarasını reddeder", async () => {
+    const result = await useAuthStore.getState().sendPhoneOtp("12345");
+    expect(result.success).toBe(false);
+    expect(mockSignInWithOtp).not.toHaveBeenCalled();
+  });
+
+  it("loginWithPhone supabase.auth.verifyOtp çağırır ve hata durumunda sahte kullanıcı üretmez (G-04 / K-01)", async () => {
+    mockVerifyOtp.mockResolvedValue({
+      data: { user: null },
+      error: new Error("Invalid OTP"),
+    });
+
+    const user = await useAuthStore.getState().loginWithPhone("05321000001", "000000");
+    expect(mockVerifyOtp).toHaveBeenCalledWith({
+      phone: "+905321000001",
+      token: "000000",
+      type: "sms",
+    });
+    expect(user).toBeNull();
+    expect(useAuthStore.getState().user).toBeNull();
+  });
+
+  it("loginWithEmail yanlış şifre veya Supabase hatasında sahte Admin kullanıcısı üretmez (G-04 / K-01)", async () => {
+    mockSignInWithPassword.mockResolvedValue({
+      data: { user: null },
+      error: new Error("Invalid login credentials"),
+    });
+
+    const user = await useAuthStore
+      .getState()
+      .loginWithEmail("admin@yildizkuafor.com", "yanlisSifre123");
+    expect(user).toBeNull();
+    expect(useAuthStore.getState().user).toBeNull();
+  });
+
+  it("registerWithEmail 8 karakterden kısa şifreyi reddeder ve Supabase hatasında sahte kullanıcı üretmez", async () => {
+    const shortRes = await useAuthStore
+      .getState()
+      .registerWithEmail("Ayşe", "Yılmaz", "05321112233", "ayse@example.com", "kisa12");
+    expect(shortRes.success).toBe(false);
+    expect(shortRes.error).toContain("en az 8 karakter");
+
+    mockSignUp.mockResolvedValue({
+      data: { user: null },
+      error: { message: "User already registered" },
+    });
+
+    const failRes = await useAuthStore
+      .getState()
+      .registerWithEmail("Ayşe", "Yılmaz", "05321112233", "ayse@example.com", "GecerliSifre123");
+    expect(failRes.success).toBe(false);
+    expect(useAuthStore.getState().user).toBeNull();
   });
 
   it("logout Zustand store'u sıfırlar ve Supabase signOut çağırır", async () => {

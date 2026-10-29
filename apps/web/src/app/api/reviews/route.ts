@@ -1,41 +1,85 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+
+const PublicReviewBodySchema = z
+  .object({
+    musteri_adi: z.string().trim().max(100).optional(),
+    musteriAdi: z.string().trim().max(100).optional(),
+    puan: z.coerce
+      .number()
+      .int()
+      .min(1, "Puan 1 ile 5 arasında olmalıdır.")
+      .max(5, "Puan 1 ile 5 arasında olmalıdır.")
+      .default(5),
+    yorum: z.string().trim().max(1000, "Yorum en fazla 1000 karakter olabilir.").optional(),
+    hizmet_turu: z.string().trim().max(100).optional(),
+    hizmetTuru: z.string().trim().max(100).optional(),
+    randevu_id: z.string().uuid("Geçersiz randevu kimliği.").nullable().optional(),
+    randevuId: z.string().uuid("Geçersiz randevu kimliği.").nullable().optional(),
+  })
+  .refine(
+    (data) => {
+      const name = (data.musteri_adi || data.musteriAdi || "").trim();
+      return name.length >= 2;
+    },
+    { message: "Lütfen adınızı ve soyadınızı belirtiniz." }
+  );
 
 export async function POST(request: Request) {
   try {
-    const supabase = getSupabaseAdmin();
-    if (!supabase) {
-      return NextResponse.json({ error: "Supabase bağlantısı eksik." }, { status: 500 });
+    const rate = checkRateLimit(`public-reviews:${getClientIp(request)}`, 10, 60_000);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Çok fazla değerlendirme isteği gönderildi. Lütfen biraz bekleyiniz." },
+        { status: 429 }
+      );
     }
 
-    const body = await request.json().catch(() => ({}));
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return safeErrorResponse("Supabase bağlantısı eksik.", 500);
+    }
+
+    const parsed = await parseJsonBody(request, PublicReviewBodySchema);
+    if (!parsed.success) {
+      return parsed.response;
+    }
+
+    const body = parsed.data;
     const musteriAdi = (body.musteri_adi || body.musteriAdi || "").trim();
-    const puan = Number(body.puan) || 5;
+    const puan = body.puan ?? 5;
     const yorum = (body.yorum || "").trim();
     const hizmetTuru = (body.hizmet_turu || body.hizmetTuru || "Genel Hizmet").trim();
     const randevuId = body.randevu_id || body.randevuId || null;
-    const kaynak = body.kaynak || "Hizmet Sonrası";
 
-    if (!musteriAdi) {
-      return NextResponse.json(
-        { error: "Lütfen adınızı ve soyadınızı belirtiniz." },
-        { status: 400 },
-      );
+    if (randevuId) {
+      const { data: appointment } = await supabase
+        .from("appointments")
+        .select("id, durum")
+        .eq("id", randevuId)
+        .maybeSingle();
+
+      if (
+        !appointment ||
+        ("durum" in appointment &&
+          appointment.durum !== undefined &&
+          appointment.durum !== "Tamamlandı")
+      ) {
+        return NextResponse.json(
+          { error: "Yalnızca tamamlanmış randevular değerlendirilebilir." },
+          { status: 400 }
+        );
+      }
     }
 
-    if (puan < 1 || puan > 5) {
-      return NextResponse.json(
-        { error: "Puan 1 ile 5 arasında olmalıdır." },
-        { status: 400 },
-      );
-    }
-
-    // Smart Review Funnel: 4 ve 5 yıldız doğrudan vitrinde aktif; 1-3 yıldız inceleme için pasif
     const isHighRating = puan >= 4;
-    const aktif = isHighRating;
 
+    // Şartname Madde 15 & 16: Müşteri yorumları moderasyonludur (aktif: false)
     const { data, error } = await supabase
       .from("customer_reviews")
       .insert({
@@ -44,14 +88,14 @@ export async function POST(request: Request) {
         yorum: yorum || null,
         hizmet_turu: hizmetTuru,
         randevu_id: randevuId,
-        kaynak,
-        aktif,
+        kaynak: "Hizmet Sonrası",
+        aktif: false,
       })
       .select("*")
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return safeErrorResponse("Değerlendirme kaydedilemedi.", 500, error);
     }
 
     return NextResponse.json({
@@ -63,7 +107,6 @@ export async function POST(request: Request) {
         : "Geri bildiriminiz için teşekkür ederiz. Memnuniyetiniz adına sizinle iletişime geçeceğiz.",
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Değerlendirme kaydedilemedi";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return safeErrorResponse("Değerlendirme kaydedilemedi.", 500, err);
   }
 }

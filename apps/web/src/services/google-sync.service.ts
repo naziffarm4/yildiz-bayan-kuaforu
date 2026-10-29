@@ -167,11 +167,22 @@ export async function executeGoogleSync(force = false) {
         .eq("id", settingsRow.id);
     }
 
-    // 4. Gelen Google yorumlarını customer_reviews tablosuna ekle (mükerrer olmadan)
+    // 4. Gelen Google yorumlarını customer_reviews tablosuna ekle (mükerrer olmadan, toplu insert - P-03)
     if (incomingReviews.length > 0) {
-      const { data: existingReviews } = await supabase
+      const selectQuery = supabase
         .from("customer_reviews")
-        .select("musteri_adi, yorum");
+        .select("musteri_adi, yorum") as unknown as {
+        limit?: (n: number) => Promise<{
+          data: Array<{ musteri_adi: string; yorum: string | null }> | null;
+        }>;
+      } & Promise<{
+        data: Array<{ musteri_adi: string; yorum: string | null }> | null;
+      }>;
+
+      const { data: existingReviews } =
+        typeof selectQuery.limit === "function"
+          ? await selectQuery.limit(500)
+          : await selectQuery;
 
       const existingSet = new Set(
         (existingReviews || []).map(
@@ -179,13 +190,21 @@ export async function executeGoogleSync(force = false) {
         )
       );
 
+      const rowsToInsert: Array<{
+        musteri_adi: string;
+        yorum: string;
+        puan: number;
+        hizmet_turu: string;
+        aktif: boolean;
+      }> = [];
+
       for (const rev of incomingReviews) {
         const author = rev.authorAttribution?.displayName?.trim() || "Google Kullanıcısı";
         const comment = (rev.text?.text || rev.originalText?.text || "").trim();
         const score = typeof rev.rating === "number" ? Math.min(Math.max(rev.rating, 1), 5) : 5;
 
         if (comment && !existingSet.has(`${author}:::${comment}`)) {
-          await supabase.from("customer_reviews").insert({
+          rowsToInsert.push({
             musteri_adi: author,
             yorum: comment,
             puan: score,
@@ -193,8 +212,12 @@ export async function executeGoogleSync(force = false) {
             aktif: true,
           });
           existingSet.add(`${author}:::${comment}`);
-          newReviewsCount++;
         }
+      }
+
+      if (rowsToInsert.length > 0) {
+        await supabase.from("customer_reviews").insert(rowsToInsert);
+        newReviewsCount = rowsToInsert.length;
       }
     }
   }

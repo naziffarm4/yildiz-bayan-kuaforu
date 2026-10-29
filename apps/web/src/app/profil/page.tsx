@@ -120,8 +120,8 @@ export default function ProfilePage() {
       return;
     }
 
-    if (!newPassword || newPassword.length < 6) {
-      const err = "Yeni şifreniz en az 6 karakterden oluşmalıdır.";
+    if (!newPassword || newPassword.length < 8) {
+      const err = "Şifre en az 8 karakter olmalıdır.";
       setErrorMsg(err);
       toast.error(err);
       return;
@@ -355,20 +355,20 @@ export default function ProfilePage() {
                     </label>
                     <PasswordInput
                       required
-                      minLength={6}
+                      minLength={8}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="En az 6 karakter"
+                      placeholder="En az 8 karakter"
                     />
                   </div>
                   <div>
                     <label className="block font-medium text-text-primary mb-1">Yeni Şifre (Tekrar)</label>
                     <PasswordInput
                       required
-                      minLength={6}
+                      minLength={8}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="En az 6 karakter"
+                      placeholder="En az 8 karakter"
                     />
                   </div>
                 </div>

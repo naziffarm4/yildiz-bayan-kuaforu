@@ -108,6 +108,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
                   durum: "Beklemede",
                   kaynak: "Web",
                   notlar: payload.notlar ?? null,
+                  kvkk_onay_tarihi: payload.kvkk_onay_tarihi ?? new Date().toISOString(),
                   olusturulma_tarihi: new Date().toISOString(),
                 },
                 error: null,
@@ -260,6 +261,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
         tarih_saat: "2026-10-30T10:00:00.000Z",
+        kvkkOnay: true,
       }),
     });
 
@@ -281,6 +283,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         tarih_saat: "2026-10-30T10:00:00.000Z",
         toplam_sure_dakika: 999,
         notlar: "Özel fön isteği",
+        kvkkOnay: true,
       }),
     });
 
@@ -307,6 +310,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
           musteri_telefon: "0532 123 45 67",
           hizmet_idleri: ["srv-1"],
           tarih_saat: "2026-10-30T10:00:00.000Z",
+          kvkkOnay: true,
         }),
       });
 
@@ -344,6 +348,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_telefon: "0532 123 45 67",
         hizmet_idleri: ["srv-1"],
         tarih_saat: "2026-10-30T10:00:00.000Z",
+        kvkkOnay: true,
       }),
     });
 
@@ -397,6 +402,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_telefon: "0533 999 88 77",
         hizmet_idleri: ["srv-1"],
         tarih_saat: "2026-10-30T10:00:00.000Z",
+        kvkkOnay: true,
       }),
     });
 
@@ -455,6 +461,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_telefon: "0533 999 88 77",
         hizmet_idleri: ["srv-1"],
         tarih_saat: "2026-10-30T10:00:00.000Z",
+        kvkkOnay: true,
       }),
     });
 
@@ -465,10 +472,11 @@ describe("Public Appointments API Route (/api/appointments)", () => {
     expect(appointmentInsertPayload).not.toBeNull();
     if (appointmentInsertPayload) {
       expect(appointmentInsertPayload["musteri_id"]).toBeNull();
+      expect(typeof appointmentInsertPayload["kvkk_onay_tarihi"]).toBe("string");
     }
   });
 
-  it("isteğe bağlı kvkk_onay / kvkkOnay alanlarını geçerli kabul eder (O8)", async () => {
+  it("kvkk_onay / kvkkOnay true gönderildiğinde kabul eder ve kvkk_onay_tarihi kaydeder (O8, YN-7)", async () => {
     const req = new Request("http://localhost/api/appointments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -485,6 +493,40 @@ describe("Public Appointments API Route (/api/appointments)", () => {
     expect(res.status).toBe(201);
     const json = await res.json();
     expect(json.success).toBe(true);
+    expect(typeof json.data.kvkk_onay_tarihi).toBe("string");
+  });
+
+  it("kvkkOnay eksik veya false gönderildiğinde 400 Bad Request döner (YN-7)", async () => {
+    const missingReq = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Fatma Demir",
+        musteri_telefon: "0532 234 56 78",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-10-30T10:00:00.000Z",
+      }),
+    });
+    const missingRes = await POST(missingReq);
+    expect(missingRes.status).toBe(400);
+    const missingJson = await missingRes.json();
+    expect(missingJson.error).toContain("KVKK");
+
+    const falseReq = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Fatma Demir",
+        musteri_telefon: "0532 234 56 78",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-10-30T10:00:00.000Z",
+        kvkkOnay: false,
+      }),
+    });
+    const falseRes = await POST(falseReq);
+    expect(falseRes.status).toBe(400);
+    const falseJson = await falseRes.json();
+    expect(falseJson.error).toContain("KVKK");
   });
 
   it("geçmiş tarihe randevu alınmaya çalışıldığında 400 döner (O9)", async () => {
@@ -496,6 +538,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
         tarih_saat: "2024-01-01T10:00:00.000Z",
+        kvkkOnay: true,
       }),
     });
 
@@ -515,6 +558,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-nonexistent-id"],
         tarih_saat: "2026-10-30T10:00:00.000Z",
+        kvkkOnay: true,
       }),
     });
 
@@ -534,6 +578,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
         tarih_saat: "2026-10-30T02:00:00.000Z", // Istanbul 05:00
+        kvkkOnay: true,
       }),
     });
 
@@ -576,6 +621,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
         tarih_saat: "2026-11-01T11:00:00.000Z",
+        kvkkOnay: true,
       }),
     });
 

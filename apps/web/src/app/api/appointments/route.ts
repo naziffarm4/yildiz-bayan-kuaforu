@@ -64,7 +64,9 @@ const NormalizedAppointmentSchema = z
       ),
     toplamSureDakika: z.number().int().positive().default(30),
     notlar: z.string().max(500, "Not alanı en fazla 500 karakter olabilir.").nullable(),
-    kvkkOnay: z.boolean().optional(),
+    kvkkOnay: z.literal(true, {
+      errorMap: () => ({ message: "KVKK aydınlatma metnini onaylamanız zorunludur." }),
+    }),
   })
   .strict();
 
@@ -415,6 +417,7 @@ export async function POST(request: Request) {
         durum: "Beklemede",
         kaynak: "Web",
         notlar,
+        kvkk_onay_tarihi: new Date().toISOString(),
       })
       .select("*")
       .single();

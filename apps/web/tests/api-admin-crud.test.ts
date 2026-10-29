@@ -2,9 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CustomerReviewSchema, GalleryCommentSchema, generateSafeUUID } from "@yildiz/types";
 import type { RouteHandler } from "../src/lib/auth/api-guard";
 
-const { mockAuthGetUser, mockRpc, mockStorageUpload, mockStorageGetPublicUrl } = vi.hoisted(() => ({
+const { mockAuthGetUser, mockProfileMaybeSingle, mockRpc, mockStorageUpload, mockStorageGetPublicUrl } = vi.hoisted(() => ({
   mockAuthGetUser: vi.fn().mockResolvedValue({
     data: { user: { id: "auth-user-123" } },
+    error: null,
+  }),
+  mockProfileMaybeSingle: vi.fn().mockResolvedValue({
+    data: { rol: "Calisan" },
     error: null,
   }),
   mockRpc: vi.fn().mockResolvedValue({
@@ -25,6 +29,13 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: {
       getUser: mockAuthGetUser,
     },
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: mockProfileMaybeSingle,
+        })),
+      })),
+    })),
     rpc: mockRpc,
   })),
 }));
@@ -98,7 +109,7 @@ import { GET as InventoryGET, POST as InventoryPOST, DELETE as InventoryDELETE, 
 import { GET as SuppliersGET, POST as SuppliersPOST, DELETE as SuppliersDELETE, PATCH as SuppliersPATCH } from "../src/app/api/admin/suppliers/route";
 import { GET as AppointmentsGET, PATCH as AppointmentsPATCH, DELETE as AppointmentsDELETE } from "../src/app/api/admin/appointments/route";
 import { GET as GalleryGET, POST as GalleryPOST, DELETE as GalleryDELETE, PATCH as GalleryPATCH } from "../src/app/api/admin/gallery/route";
-import { GET as AdminGalleryCommentsGET, DELETE as AdminGalleryCommentsDELETE } from "../src/app/api/admin/gallery/comments/route";
+import { GET as AdminGalleryCommentsGET, PATCH as AdminGalleryCommentsPATCH, DELETE as AdminGalleryCommentsDELETE } from "../src/app/api/admin/gallery/comments/route";
 import { POST as GalleryLikePOST } from "../src/app/api/gallery/like/route";
 import { GET as GalleryCommentsGET, POST as GalleryCommentsPOST } from "../src/app/api/gallery/comments/route";
 import { POST as PublicReviewPOST } from "../src/app/api/reviews/route";
@@ -830,6 +841,74 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       const json = await res.json();
       expect(json.success).toBe(true);
       expect(Array.isArray(json.data)).toBe(true);
+    });
+
+    it("PATCH geçerli UUID ve aktif alanı ile yorumu onaylar (YN-3)", async () => {
+      const req = new Request("http://localhost/api/admin/gallery/comments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: "11111111-1111-4111-8111-111111111111",
+          aktif: true,
+        }),
+      });
+      const res = await AdminGalleryCommentsPATCH(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data).toBeDefined();
+    });
+
+    it("PATCH geçersiz UUID veya eksik aktif alanı ile 400 döner (YN-3)", async () => {
+      const req = new Request("http://localhost/api/admin/gallery/comments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: "invalid-uuid",
+        }),
+      });
+      const res = await AdminGalleryCommentsPATCH(req);
+      expect(res.status).toBe(400);
+    });
+
+    it("PATCH gerçek withAdminAuth altında oturumsuz (401) ve Calisan (403) erişimini reddeder (YN-3)", async () => {
+      const { withAdminAuth: realWithAdminAuth } = await vi.importActual<
+        typeof import("../src/lib/auth/api-guard")
+      >("../src/lib/auth/api-guard");
+
+      const guardedPatch = realWithAdminAuth(AdminGalleryCommentsPATCH);
+
+      mockAuthGetUser.mockResolvedValueOnce({
+        data: { user: null },
+        error: new Error("No session"),
+      });
+
+      const unauthReq = new Request("http://localhost/api/admin/gallery/comments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: "11111111-1111-4111-8111-111111111111",
+          aktif: true,
+        }),
+      });
+      const unauthRes = await guardedPatch(unauthReq);
+      expect(unauthRes.status).toBe(401);
+
+      mockAuthGetUser.mockResolvedValueOnce({
+        data: { user: { id: "staff-1" } },
+        error: null,
+      });
+
+      const forbiddenReq = new Request("http://localhost/api/admin/gallery/comments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: "11111111-1111-4111-8111-111111111111",
+          aktif: true,
+        }),
+      });
+      const forbiddenRes = await guardedPatch(forbiddenReq);
+      expect(forbiddenRes.status).toBe(403);
     });
 
     it("DELETE id eksikse 400 döner", async () => {

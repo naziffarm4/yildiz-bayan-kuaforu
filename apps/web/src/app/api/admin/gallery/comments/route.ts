@@ -1,9 +1,16 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { withAdminAuth, withStaffOrAdminAuth } from "@/lib/auth/api-guard";
-import { safeErrorResponse } from "@/lib/api-utils";
+import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
+import { recordAuditLog } from "@/lib/audit-log";
+
+const AdminGalleryCommentPatchSchema = z.object({
+  id: z.string().uuid("Geçerli bir yorum ID'si gereklidir."),
+  aktif: z.boolean({ required_error: "aktif alanı zorunludur." }),
+});
 
 export const GET = withStaffOrAdminAuth(async (request: Request) => {
   try {
@@ -36,6 +43,47 @@ export const GET = withStaffOrAdminAuth(async (request: Request) => {
     });
   } catch (err: unknown) {
     return safeErrorResponse("Yorumlar getirilemedi.", 500, err);
+  }
+});
+
+export const PATCH = withAdminAuth(async (request: Request) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return safeErrorResponse("Supabase bağlantısı eksik.", 500);
+    }
+
+    const parsed = await parseJsonBody(request, AdminGalleryCommentPatchSchema);
+    if (!parsed.success) {
+      return parsed.response;
+    }
+
+    const { id, aktif } = parsed.data;
+
+    const { data, error } = await supabase
+      .from("gallery_comments")
+      .update({ aktif })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      return safeErrorResponse("Yorum durumu güncellenemedi.", 500, error);
+    }
+
+    await recordAuditLog({
+      action: "gallery_comment.moderate",
+      entityType: "gallery_comments",
+      entityId: id,
+      metadata: { aktif },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data,
+    });
+  } catch (err: unknown) {
+    return safeErrorResponse("Yorum durumu güncellenemedi.", 500, err);
   }
 });
 

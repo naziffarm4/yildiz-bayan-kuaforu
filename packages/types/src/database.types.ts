@@ -563,7 +563,15 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      toggle_gallery_like: {
+        Args: {
+          p_gallery_id: string;
+          p_action?: string;
+        };
+        Returns: number;
+      };
+    };
     Enums: {
       user_role: UserRole;
       appointment_status: AppointmentStatus;

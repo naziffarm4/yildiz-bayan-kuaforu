@@ -2,9 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CustomerReviewSchema, GalleryCommentSchema, generateSafeUUID } from "@yildiz/types";
 import type { RouteHandler } from "../src/lib/auth/api-guard";
 
-const { mockAuthGetUser, mockStorageUpload, mockStorageGetPublicUrl } = vi.hoisted(() => ({
+const { mockAuthGetUser, mockRpc, mockStorageUpload, mockStorageGetPublicUrl } = vi.hoisted(() => ({
   mockAuthGetUser: vi.fn().mockResolvedValue({
     data: { user: { id: "auth-user-123" } },
+    error: null,
+  }),
+  mockRpc: vi.fn().mockResolvedValue({
+    data: 6,
     error: null,
   }),
   mockStorageUpload: vi.fn().mockResolvedValue({ error: { message: "Storage mock error" } }),
@@ -21,6 +25,7 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: {
       getUser: mockAuthGetUser,
     },
+    rpc: mockRpc,
   })),
 }));
 
@@ -532,6 +537,11 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
         data: { user: { id: "auth-user-123" } },
         error: null,
       });
+      mockRpc.mockClear();
+      mockRpc.mockResolvedValue({
+        data: 6,
+        error: null,
+      });
     });
 
     it("POST oturumsuz kullanıcıya 401 döner (S9 - Şartname Madde 18)", async () => {
@@ -551,6 +561,7 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
 
       const res = await GalleryLikePOST(req);
       expect(res.status).toBe(401);
+      expect(mockRpc).not.toHaveBeenCalled();
     });
 
     it("POST eksik galleryId ile 400 döner", async () => {
@@ -578,7 +589,7 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       expect(res.status).toBe(400);
     });
 
-    it("POST like aksiyonu ile begeni sayısını artırır", async () => {
+    it("POST like aksiyonu ile atomik toggle_gallery_like RPC çağırır ve yeni sayıyı döner (YN-1, YN-4)", async () => {
       const req = new Request("http://localhost/api/gallery/like", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -592,10 +603,16 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
-      expect(json.begeniSayisi).toBeGreaterThanOrEqual(0);
+      expect(json.count).toBe(6);
+      expect(json.begeniSayisi).toBe(6);
+      expect(mockRpc).toHaveBeenCalledWith("toggle_gallery_like", {
+        p_gallery_id: "test-gallery-id",
+        p_action: "like",
+      });
     });
 
-    it("POST unlike aksiyonunu ve id alanını da kabul eder", async () => {
+    it("POST unlike aksiyonunu ve id alanını kabul ederek RPC'ye iletir", async () => {
+      mockRpc.mockResolvedValueOnce({ data: 4, error: null });
       const req = new Request("http://localhost/api/gallery/like", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -609,6 +626,30 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
+      expect(json.count).toBe(4);
+      expect(mockRpc).toHaveBeenCalledWith("toggle_gallery_like", {
+        p_gallery_id: "test-gallery-id",
+        p_action: "unlike",
+      });
+    });
+
+    it("POST RPC hata döndürdüğünde 500 döner", async () => {
+      mockRpc.mockResolvedValueOnce({
+        data: null,
+        error: { message: "RPC failure" },
+      });
+
+      const req = new Request("http://localhost/api/gallery/like", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          galleryId: "test-gallery-id",
+          action: "like",
+        }),
+      });
+
+      const res = await GalleryLikePOST(req);
+      expect(res.status).toBe(500);
     });
   });
 

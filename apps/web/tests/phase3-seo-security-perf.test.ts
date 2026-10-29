@@ -59,6 +59,8 @@ describe("Faz 3: Güvenlik Başlıkları, Görsel Optimizasyonu ve SEO Yapıland
       expect(headerMap.get("Cross-Origin-Opener-Policy")).toBe("same-origin-allow-popups");
       expect(headerMap.get("X-DNS-Prefetch-Control")).toBe("on");
       expect(headerMap.get("Content-Security-Policy")).toContain("default-src 'self'");
+      expect(headerMap.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline';");
+      expect(headerMap.get("Content-Security-Policy")).not.toContain("'unsafe-eval'");
     });
   });
 

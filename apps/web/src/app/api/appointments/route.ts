@@ -13,48 +13,148 @@ import {
   recordIdempotencyKey,
 } from "@/lib/rate-limit";
 import { generateSafeUUID } from "@yildiz/types";
+import { SALON_INFO } from "@/lib/site-defaults";
 
-const RawAppointmentBodySchema = z.object({
-  musteri_ad_soyad: z.string().optional(),
-  musteriAdSoyad: z.string().optional(),
-  musteri_telefon: z.string().optional(),
-  musteriTelefon: z.string().optional(),
-  hizmet_idleri: z.array(z.string().trim().min(1)).optional(),
-  hizmetIdleri: z.array(z.string().trim().min(1)).optional(),
-  tarih_saat: z.string().optional(),
-  tarihSaat: z.string().optional(),
-  toplam_sure_dakika: z.union([z.number(), z.string()]).optional(),
-  toplamSureDakika: z.union([z.number(), z.string()]).optional(),
-  notlar: z.string().nullable().optional(),
-  not: z.string().nullable().optional(),
-  kvkk_onay: z.boolean().optional(),
-  kvkkOnay: z.boolean().optional(),
-});
+const RawAppointmentBodySchema = z
+  .object({
+    musteri_ad_soyad: z.string().optional(),
+    musteriAdSoyad: z.string().optional(),
+    musteri_telefon: z.string().optional(),
+    musteriTelefon: z.string().optional(),
+    hizmet_idleri: z.array(z.string().trim().min(1)).optional(),
+    hizmetIdleri: z.array(z.string().trim().min(1)).optional(),
+    tarih_saat: z.string().optional(),
+    tarihSaat: z.string().optional(),
+    toplam_sure_dakika: z.union([z.number(), z.string()]).optional(),
+    toplamSureDakika: z.union([z.number(), z.string()]).optional(),
+    notlar: z.string().nullable().optional(),
+    not: z.string().nullable().optional(),
+    kvkk_onay: z.boolean().optional(),
+    kvkkOnay: z.boolean().optional(),
+  })
+  .strict();
 
-const NormalizedAppointmentSchema = z.object({
-  musteriAdSoyad: z
-    .string()
-    .trim()
-    .min(1, "Müşteri adı ve soyadı zorunludur.")
-    .max(100, "Müşteri adı ve soyadı en fazla 100 karakter olabilir."),
-  musteriTelefon: z
-    .string()
-    .trim()
-    .min(1, "Müşteri telefon numarası zorunludur.")
-    .regex(/^[0-9+\s()-]+$/, "Geçersiz telefon numarası formatı.")
-    .refine(
-      (val) => val.replace(/\D/g, "").length >= 10 && val.replace(/\D/g, "").length <= 15,
-      "Geçerli bir telefon numarası giriniz."
-    ),
-  hizmetIdleri: z
-    .array(z.string().trim().min(1))
-    .min(1, "En az bir hizmet seçilmelidir.")
-    .max(10, "En fazla 10 hizmet seçilebilir."),
-  tarihSaat: z.string().trim().min(1, "Randevu tarihi ve saati seçilmelidir."),
-  toplamSureDakika: z.number().int().positive().default(30),
-  notlar: z.string().max(500, "Not alanı en fazla 500 karakter olabilir.").nullable(),
-  kvkkOnay: z.boolean().optional(),
-});
+const NormalizedAppointmentSchema = z
+  .object({
+    musteriAdSoyad: z
+      .string()
+      .trim()
+      .min(1, "Müşteri adı ve soyadı zorunludur.")
+      .max(80, "Müşteri adı ve soyadı en fazla 80 karakter olabilir."),
+    musteriTelefon: z
+      .string()
+      .trim()
+      .min(1, "Müşteri telefon numarası zorunludur.")
+      .regex(/^[0-9+\s()-]+$/, "Geçersiz telefon numarası formatı.")
+      .refine(
+        (val) => val.replace(/\D/g, "").length >= 10 && val.replace(/\D/g, "").length <= 15,
+        "Geçerli bir telefon numarası giriniz."
+      ),
+    hizmetIdleri: z
+      .array(z.string().trim().min(1))
+      .min(1, "En az bir hizmet seçilmelidir.")
+      .max(10, "En fazla 10 hizmet seçilebilir."),
+    tarihSaat: z
+      .string()
+      .trim()
+      .min(1, "Randevu tarihi ve saati seçilmelidir.")
+      .refine(
+        (val) => !isNaN(Date.parse(val)) && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(val),
+        "Geçerli bir tarih ve saat formatı giriniz."
+      ),
+    toplamSureDakika: z.number().int().positive().default(30),
+    notlar: z.string().max(500, "Not alanı en fazla 500 karakter olabilir.").nullable(),
+    kvkkOnay: z.boolean().optional(),
+  })
+  .strict();
+
+interface WorkingHoursCheck {
+  valid: boolean;
+  error?: string;
+}
+
+function checkBusinessHours(
+  apptDate: Date,
+  calismaSaatleri: Record<string, unknown>
+): WorkingHoursCheck {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Istanbul",
+    weekday: "short",
+    hour: "numeric",
+    minute: "numeric",
+    hourCycle: "h23",
+  });
+  const parts = formatter.formatToParts(apptDate);
+  const weekday = parts.find((p) => p.type === "weekday")?.value;
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const apptMinutes = hour * 60 + minute;
+
+  let dayKeyCandidates: string[] = [];
+  let dayNameTr = "Seçilen gün";
+
+  if (weekday === "Sun") {
+    dayKeyCandidates = ["pazar", "Pazar", "sunday", "Sunday"];
+    dayNameTr = "Pazar";
+  } else if (weekday === "Sat") {
+    dayKeyCandidates = ["cumartesi", "Cumartesi", "saturday", "Saturday"];
+    dayNameTr = "Cumartesi";
+  } else {
+    dayKeyCandidates = [
+      "hafta_ici",
+      "haftaIci",
+      "haftaici",
+      "weekday",
+      "pazartesi",
+      "sali",
+      "carsamba",
+      "persembe",
+      "cuma",
+    ];
+    dayNameTr = "Hafta içi";
+  }
+
+  let scheduleStr: string | null = null;
+  for (const key of dayKeyCandidates) {
+    const val = calismaSaatleri[key];
+    if (typeof val === "string" && val.trim().length > 0) {
+      scheduleStr = val.trim();
+      break;
+    }
+  }
+
+  if (!scheduleStr) {
+    if (weekday === "Sun") scheduleStr = "10:00 - 18:00";
+    else if (weekday === "Sat") scheduleStr = "09:00 - 20:30";
+    else scheduleStr = "09:00 - 20:00";
+  }
+
+  if (/kapalı|kapali|closed/i.test(scheduleStr)) {
+    return {
+      valid: false,
+      error: `Salonumuz ${dayNameTr} günleri hizmet vermemektedir (Kapalı).`,
+    };
+  }
+
+  const match = scheduleStr.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
+  if (!match) {
+    return { valid: true };
+  }
+
+  const openMinutes = Number(match[1]) * 60 + Number(match[2]);
+  const closeMinutes = Number(match[3]) * 60 + Number(match[4]);
+
+  if (apptMinutes < openMinutes || apptMinutes >= closeMinutes) {
+    const openFormatted = `${match[1]?.padStart(2, "0")}:${match[2]}`;
+    const closeFormatted = `${match[3]?.padStart(2, "0")}:${match[4]}`;
+    return {
+      valid: false,
+      error: `Randevu saati çalışma saatleri dışındadır. ${dayNameTr} çalışma saatlerimiz: ${openFormatted} - ${closeFormatted}`,
+    };
+  }
+
+  return { valid: true };
+}
 
 export async function POST(request: Request) {
   try {
@@ -132,9 +232,23 @@ export async function POST(request: Request) {
       musteriTelefon,
       hizmetIdleri,
       tarihSaat,
-      toplamSureDakika: fallbackDuration,
       notlar,
     } = validated.data;
+
+    // 1. Geçmiş Tarih Kontrolü (O9)
+    const apptDate = new Date(tarihSaat);
+    if (isNaN(apptDate.getTime())) {
+      return NextResponse.json(
+        { success: false, error: "Geçerli bir tarih ve saat formatı giriniz." },
+        { status: 400 }
+      );
+    }
+    if (apptDate.getTime() < Date.now()) {
+      return NextResponse.json(
+        { success: false, error: "Geçmiş tarihe randevu alınamaz." },
+        { status: 400 }
+      );
+    }
 
     const formattedPhone = normalizePhoneNumber(musteriTelefon);
     const cleanDigits = musteriTelefon.replace(/\D/g, "");
@@ -148,7 +262,72 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1. Çifte gönderim / aynı saat ve telefonda aktif randevu çakışma kontrolü
+    // 2. Çalışma Saatleri & Kapalı Günler Kontrolü (O9)
+    let rawCalismaSaatleri: Record<string, unknown> | null = null;
+    try {
+      const { data: settingsData } = await supabaseAdmin
+        .from("site_settings")
+        .select("calisma_saatleri")
+        .limit(1)
+        .maybeSingle();
+
+      if (
+        settingsData?.calisma_saatleri &&
+        typeof settingsData.calisma_saatleri === "object"
+      ) {
+        rawCalismaSaatleri = settingsData.calisma_saatleri as Record<string, unknown>;
+      }
+    } catch {
+      // Ayarlar tablosu okunamazsa varsayılan SALON_INFO kullanılır
+    }
+
+    const businessHoursCheck = checkBusinessHours(
+      apptDate,
+      rawCalismaSaatleri ?? (SALON_INFO.calismaSaatleri as unknown as Record<string, unknown>)
+    );
+    if (!businessHoursCheck.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: businessHoursCheck.error || "Randevu saati çalışma saatleri dışındadır.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // 3. Aktif Hizmet Doğrulaması ve Süre Hesabı (O9)
+    let servicesData: { id: string; tahmini_sure_dakika: number }[] | null = null;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("services")
+        .select("id, tahmini_sure_dakika")
+        .in("id", hizmetIdleri)
+        .eq("aktif", true);
+
+      if (!error && Array.isArray(data)) {
+        servicesData = data as { id: string; tahmini_sure_dakika: number }[];
+      }
+    } catch {
+      servicesData = null;
+    }
+
+    if (!servicesData || servicesData.length !== hizmetIdleri.length) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Seçilen hizmetlerden biri veya birkaçı geçersizdir.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const totalServiceMinutes = servicesData.reduce((acc, item) => {
+      const d = Number(item.tahmini_sure_dakika ?? 0);
+      return acc + (Number.isFinite(d) && d > 0 ? d : 0);
+    }, 0);
+    const computedDuration = totalServiceMinutes > 0 ? totalServiceMinutes : 30;
+
+    // 4. Çifte gönderim / aynı saat ve telefonda aktif randevu çakışma kontrolü
     try {
       const existingQuery = supabaseAdmin
         .from("appointments")
@@ -171,29 +350,6 @@ export async function POST(request: Request) {
       }
     } catch {
       // Sorgu desteklenmiyorsa devam et
-    }
-
-    // 2. Hizmet sürelerini sunucuda hesapla (G-06)
-    let computedDuration = fallbackDuration;
-    try {
-      const { data: servicesData } = await supabaseAdmin
-        .from("services")
-        .select("id, tahmini_sure_dakika")
-        .in("id", hizmetIdleri);
-
-      if (Array.isArray(servicesData) && servicesData.length > 0) {
-        const sum = servicesData.reduce((acc, item) => {
-          const d = Number(
-            (item as { tahmini_sure_dakika?: unknown }).tahmini_sure_dakika ?? 0
-          );
-          return acc + (Number.isFinite(d) && d > 0 ? d : 0);
-        }, 0);
-        if (sum > 0) {
-          computedDuration = sum;
-        }
-      }
-    } catch {
-      // Hizmet tablosu okunamazsa doğrulanmış fallback süreyi kullan
     }
 
     // 3. Müşteri Profili Çözümlemesi (G-06: Oturumsuz istekte başkasının profiline telefonla bağlama yapılmaz)

@@ -984,15 +984,15 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/api/appointments/route.ts": {
-    "mtime": 1793277520.794708,
-    "seen": 1793277691.8380358,
-    "ast_hash": "c7bef75ad1f753c9f609402432154850",
+    "mtime": 1793278418.799566,
+    "seen": 1793278576.6496704,
+    "ast_hash": "58a97f16e8c3198a6b30c14f34e6ce8a",
     "semantic_hash": ""
   },
   "apps/web/tests/api-appointments.test.ts": {
-    "mtime": 1793277557.4346502,
-    "seen": 1793277691.857033,
-    "ast_hash": "803546ed659760c91aa81eda030b2e5e",
+    "mtime": 1793278522.354542,
+    "seen": 1793278576.6693633,
+    "ast_hash": "3ec784e83c0e0adf319f24741e16bd24",
     "semantic_hash": ""
   },
   "apps/web/src/lib/phone-utils.ts": {

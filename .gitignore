@@ -38,7 +38,5 @@ coverage/
 
 # Local tooling & generated caches (G-15)
 .claude/
-graphify-out/cache/
-graphify-out/graph.html
-graphify-out/20*/
+graphify-out/
 supabase/.temp/

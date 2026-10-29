@@ -23,7 +23,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\""
   },
   "devDependencies": {
-    "eslint": "^8.57.0",
+    "eslint": "^10.13.0",
     "prettier": "^3.3.2",
     "turbo": "^2.0.4",
     "typescript": "^5.4.5",

@@ -77,6 +77,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [customerSurname, setCustomerSurname] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerNote, setCustomerNote] = useState("");
+  const [kvkkConsent, setKvkkConsent] = useState(false);
 
   // SMS Doğrulama Durumu
   const [smsSent, setSmsSent] = useState(false);
@@ -189,6 +190,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       setFormError("Girdiğiniz SMS doğrulama kodu hatalı.");
       return;
     }
+    if (!kvkkConsent) {
+      setFormError("Lütfen KVKK Aydınlatma Metni'ni onaylayınız.");
+      return;
+    }
 
     setFormError(null);
     setIsSubmitting(true);
@@ -211,6 +216,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         kaynak: "Web",
         not: customerNote.trim() || undefined,
         olusturulmaTarihi: new Date().toISOString(),
+        kvkkOnay: true,
       };
 
       await onAppointmentCreated(newAppointment);
@@ -535,6 +541,32 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   className="w-full px-3 py-2 rounded-md border border-border bg-white text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-gold"
                 />
               </div>
+
+              {/* KVKK Onay Kutusu (O8) */}
+              <div className="flex items-start gap-2.5 pt-1">
+                <input
+                  id="booking-kvkk-consent"
+                  type="checkbox"
+                  checked={kvkkConsent}
+                  onChange={(e) => setKvkkConsent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-accent-gold focus:ring-accent-gold cursor-pointer"
+                />
+                <label
+                  htmlFor="booking-kvkk-consent"
+                  className="text-[11px] leading-relaxed text-text-secondary select-none cursor-pointer"
+                >
+                  6698 sayılı KVKK kapsamında{" "}
+                  <a
+                    href="/kvkk"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent-gold font-semibold underline hover:text-text-primary"
+                  >
+                    Aydınlatma Metni
+                  </a>
+                  &apos;ni okudum ve kişisel verilerimin işlenmesini kabul ediyorum.
+                </label>
+              </div>
             </div>
           )}
 
@@ -644,7 +676,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
               <Button
                 variant="primary"
                 size="md"
-                disabled={!smsSent || !enteredSmsCode || isSubmitting}
+                disabled={!smsSent || !enteredSmsCode || !kvkkConsent || isSubmitting}
                 onClick={handleVerifySmsAndConfirm}
               >
                 {isSubmitting ? "Kaydediliyor..." : "Randevuyu Onayla ve Bloke Et ✓"}

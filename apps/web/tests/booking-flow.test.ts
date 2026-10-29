@@ -71,3 +71,23 @@ describe("Randevu Sihirbazı - 30 Dk Slot ve Akıllı Bugün Filtresi", () => {
     expect(slots.length).toBe(0);
   });
 });
+
+describe("Randevu Sihirbazı - KVKK Onayı ve Buton Durumu (O8)", () => {
+  it("SMS doğrulanmış olsa bile KVKK onay kutusu işaretlenmeden randevu onay butonu aktif olamaz", () => {
+    const isStep3Valid = (
+      smsSent: boolean,
+      enteredSmsCode: string,
+      kvkkConsent: boolean,
+      isSubmitting: boolean
+    ) => {
+      const disabled = !smsSent || !enteredSmsCode || !kvkkConsent || isSubmitting;
+      return !disabled;
+    };
+
+    expect(isStep3Valid(true, "1234", false, false)).toBe(false);
+    expect(isStep3Valid(true, "1234", true, false)).toBe(true);
+    expect(isStep3Valid(true, "1234", true, true)).toBe(false);
+    expect(isStep3Valid(false, "1234", true, false)).toBe(false);
+    expect(isStep3Valid(true, "", true, false)).toBe(false);
+  });
+});

@@ -27,6 +27,8 @@ const RawAppointmentBodySchema = z.object({
   toplamSureDakika: z.union([z.number(), z.string()]).optional(),
   notlar: z.string().nullable().optional(),
   not: z.string().nullable().optional(),
+  kvkk_onay: z.boolean().optional(),
+  kvkkOnay: z.boolean().optional(),
 });
 
 const NormalizedAppointmentSchema = z.object({
@@ -51,6 +53,7 @@ const NormalizedAppointmentSchema = z.object({
   tarihSaat: z.string().trim().min(1, "Randevu tarihi ve saati seçilmelidir."),
   toplamSureDakika: z.number().int().positive().default(30),
   notlar: z.string().max(500, "Not alanı en fazla 500 karakter olabilir.").nullable(),
+  kvkkOnay: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -110,6 +113,7 @@ export async function POST(request: Request) {
       toplamSureDakika:
         Number.isFinite(rawDuration) && rawDuration > 0 ? Math.trunc(rawDuration) : 30,
       notlar: (body.notlar ?? body.not ?? "")?.trim() || null,
+      kvkkOnay: body.kvkk_onay ?? body.kvkkOnay,
     };
 
     const validated = NormalizedAppointmentSchema.safeParse(normalizedInput);

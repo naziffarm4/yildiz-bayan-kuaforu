@@ -62,6 +62,7 @@ export default function HomePage() {
           tarih_saat: newAppointment.tarihSaat,
           toplam_sure_dakika: newAppointment.toplamSureDakika,
           notlar: newAppointment.not,
+          kvkk_onay: newAppointment.kvkkOnay ?? true,
         }),
       });
 

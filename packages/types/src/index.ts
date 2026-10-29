@@ -82,6 +82,7 @@ export const AppointmentItemSchema = z.object({
   durum: AppointmentStatusSchema,
   kaynak: AppointmentSourceSchema,
   not: z.string().optional(),
+  kvkkOnay: z.boolean().optional(),
   onaylayanKullaniciId: z.string().uuid().optional(),
   olusturulmaTarihi: z.string().datetime(),
 });

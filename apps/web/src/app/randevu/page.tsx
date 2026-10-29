@@ -34,6 +34,7 @@ function RandevuContent() {
           tarih_saat: newApp.tarihSaat,
           toplam_sure_dakika: newApp.toplamSureDakika,
           notlar: newApp.not,
+          kvkk_onay: newApp.kvkkOnay ?? true,
         }),
       });
 

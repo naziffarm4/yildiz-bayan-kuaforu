@@ -427,4 +427,23 @@ describe("Public Appointments API Route (/api/appointments)", () => {
       expect(appointmentInsertPayload["musteri_id"]).toBeNull();
     }
   });
+
+  it("isteğe bağlı kvkk_onay / kvkkOnay alanlarını geçerli kabul eder (O8)", async () => {
+    const req = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Fatma Demir",
+        musteri_telefon: "0532 234 56 78",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-10-30T10:00:00.000Z",
+        kvkk_onay: true,
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+  });
 });

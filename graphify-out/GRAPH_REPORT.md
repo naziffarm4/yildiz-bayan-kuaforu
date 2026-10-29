@@ -1,36 +1,35 @@
 # Graph Report - yildiz-bayan-kuaforu  (2026-10-29)
 
 ## Corpus Check
-- 226 files · ~113,246 words
+- 226 files · ~113,248 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 4 file(s) not represented in the graph (top: (none) 2, .example 1, .css 1)
 
 ## Summary
-- 1166 nodes · 2634 edges · 74 communities (55 shown, 19 thin omitted)
+- 1167 nodes · 2635 edges · 63 communities (51 shown, 12 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 37 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a1126dc5`
+- Built from commit: `06adb911`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- services.test.ts
+- content.service.ts
 - types/src/index.ts
-- ServiceItem
+- ui/src/index.ts
 - compilerOptions
 - ui/src/index.ts
 - ui/package.json
 - compilerOptions
 - web/package.json
 - 4. Orta
-- admin/page.tsx
-- api-guard.test.ts
+- giris/page.tsx
+- admin/appointments/route.ts
 - web/package.json
 - types/package.json
 - app-store.ts
-- AdminPage
 - tasks
 - 3. Güvenlik Bulguları
 - package.json
@@ -46,16 +45,11 @@
 - scripts
 - Card
 - ui/tsconfig.json
-- InventoryService
-- inventory.service.ts
 - config/package.json
-- ServiceService
 - Antigravity Direktör & Claude İcracı Çalışma Kuralı
-- AdminTopbar.tsx
 - ref_vitest
 - auth-context.tsx
 - compilerOptions
-- PaymentService
 - AGENTS.md
 - CONSTRAINTS - YILDIZ BAYAN KUAFÖRÜ
 - CLAUDE.md
@@ -66,19 +60,14 @@
 - api-appointments.test.ts
 - steps
 - Button
-- admin/appointments/route.ts
-- database.types.ts
+- Database
 - ref_vitest
 - middleware.test.ts
 - app/layout.tsx
 - eslint@^8.57.0
 - upload/route.ts
-- content.service.ts
 - next
-- galeri/layout.tsx
 - updates
-- hakkimizda/layout.tsx
-- randevu/layout.tsx
 - content-context.tsx
 - expire-appointments/route.ts
 - ContentService
@@ -113,27 +102,27 @@
 ## Import Cycles
 - None detected.
 
-## Communities (74 total, 19 thin omitted)
+## Communities (63 total, 12 thin omitted)
 
-### Community 0 - "services.test.ts"
-Cohesion: 0.22
-Nodes (6): LoyaltyLedgerInsert, PaymentInsert, PaymentRow, ServiceInsert, ServiceRow, ServiceUpdate
+### Community 0 - "content.service.ts"
+Cohesion: 0.05
+Nodes (26): AppointmentInsert, AppointmentRow, AppointmentUpdate, GalleryInsert, GalleryRow, GalleryRowWithCounts, GalleryUpdate, ReviewInsert (+18 more)
 
 ### Community 1 - "types/src/index.ts"
 Cohesion: 0.06
-Nodes (40): RFC-4122, AboutTexts, AboutTextsSchema, AppointmentSource, AppointmentSourceSchema, AppointmentStatusSchema, ArtistSectionTexts, ArtistSectionTextsSchema (+32 more)
+Nodes (41): RFC-4122, AboutTexts, AboutTextsSchema, AppointmentSource, AppointmentSourceSchema, AppointmentStatusSchema, ArtistSectionTexts, ArtistSectionTextsSchema (+33 more)
 
-### Community 2 - "ServiceItem"
-Cohesion: 0.12
-Nodes (22): AppointmentTrackerProps, ServiceCatalogProps, AppointmentItem, calculateCommission(), calculateLoyaltyDiscount(), calculateLoyaltyPoints(), CashPayment, PaymentMethod (+14 more)
+### Community 2 - "ui/src/index.ts"
+Cohesion: 0.05
+Nodes (53): AdminPage(), loadLiveAdminData(), AppointmentManager, CashRegisterPOS, GalleryManager, ReviewsManager, ServiceManager, SiteSettingsManager (+45 more)
 
 ### Community 3 - "compilerOptions"
 Cohesion: 0.14
 Nodes (13): compilerOptions, allowJs, incremental, jsx, module, moduleResolution, noEmit, paths (+5 more)
 
 ### Community 4 - "ui/src/index.ts"
-Cohesion: 0.12
-Nodes (17): ContactMapEmbed, ContactMapEmbed(), ContactMapEmbedProps, ContactMapSkeleton(), Card(), CardProps, CATEGORIES, DEFAULT_FORM_CATEGORIES (+9 more)
+Cohesion: 0.18
+Nodes (13): ContactMapEmbed, ContactPage(), ContactMapEmbed(), ContactMapEmbedProps, ContactMapSkeleton(), Card(), CATEGORIES, DEFAULT_FORM_CATEGORIES (+5 more)
 
 ### Community 5 - "ui/package.json"
 Cohesion: 0.05
@@ -151,13 +140,13 @@ Nodes (20): dependencies, clsx@^2.1.1, next@^15.5.28, react@^19.0.0, react-dom@^
 Cohesion: 0.05
 Nodes (36): 1. Özet, 2. Kritik, 3. Yüksek, 4. Orta, 5. Düşük, 6. Öncelikli eylem planı, 8. Doğrulanamayanlar, 9. Node.js 26.13.0 yükseltmesi (+28 more)
 
-### Community 9 - "admin/page.tsx"
-Cohesion: 0.23
-Nodes (14): AdminPage(), AppointmentManager, CashRegisterPOS, GalleryManager, ReviewsManager, ServiceManager, SiteSettingsManager, StaffCommissionManager (+6 more)
+### Community 9 - "giris/page.tsx"
+Cohesion: 0.19
+Nodes (16): dynamic, GET(), LoginForm(), LoginPage(), RegisterForm(), RegisterPage(), useAuth(), hasControlCharacters() (+8 more)
 
-### Community 10 - "api-guard.test.ts"
-Cohesion: 0.25
-Nodes (6): collectRouteFiles(), mockEq, mockFrom, mockGetUser, mockSelect, mockSingle
+### Community 10 - "admin/appointments/route.ts"
+Cohesion: 0.23
+Nodes (10): AdminAppointmentPatchSchema, dynamic, GET, DELETE, dynamic, GET, AllowedRole, withAdminAuth() (+2 more)
 
 ### Community 11 - "web/package.json"
 Cohesion: 0.09
@@ -171,21 +160,17 @@ Nodes (29): dependencies, zod@^3.23.8, devDependencies, eslint@^8.57.0, eslint-c
 Cohesion: 0.22
 Nodes (15): AppSyncMessage, fetchAdminFullName(), GalleryCommentRow, getApiUrl(), getBroadcastChannel(), getStoredLikes(), LEGACY_ADMIN_NAME, mapAppointmentFromPayload() (+7 more)
 
-### Community 14 - "AdminPage"
-Cohesion: 0.17
-Nodes (5): AppointmentInsert, AppointmentRow, AppointmentService, AppointmentUpdate, AppointmentStatus
-
 ### Community 15 - "tasks"
 Cohesion: 0.11
 Nodes (18): dependsOn, outputs, cache, persistent, globalEnv, dependsOn, inputs, $schema (+10 more)
 
 ### Community 16 - "3. Güvenlik Bulguları"
-Cohesion: 0.06
-Nodes (39): dynamic, GET(), hasControlCharacters(), safeRedirectPath(), mockEq, mockExchangeCodeForSession, mockFrom, mockSelect (+31 more)
+Cohesion: 0.07
+Nodes (31): getDevAuthUser(), 1. Yönetici Özeti, 2. Otomatik Kalite Kapısı Sonuçları, 3. Güvenlik Bulguları, 4. Optimizasyon Bulguları, 5. Kod Kalitesi Bulguları, 6. Aklınıza Gelmeyebilecek Konular (Eksikler Listesi), 7. Önerilen Düzeltme Sırası (+23 more)
 
 ### Community 17 - "package.json"
 Cohesion: 0.08
-Nodes (29): devDependencies, eslint@^8.57.0, prettier@^3.3.2, turbo@^2.0.4, typescript@^5.4.5, vitest@^1.6.0, engines, node (+21 more)
+Nodes (30): devDependencies, eslint@^8.57.0, prettier@^3.3.2, turbo@^2.0.4, typescript@^5.4.5, vitest@^1.6.0, engines, node (+22 more)
 
 ### Community 18 - "sync-google-reviews/route.ts"
 Cohesion: 0.27
@@ -205,11 +190,11 @@ Nodes (20): __dirname, envPath, __filename, __dirname, envPath, __filename, __di
 
 ### Community 22 - "ui/src/index.ts"
 Cohesion: 0.05
-Nodes (14): metadata, metadata, metadata, generateSafeUUID(), SupplierItem, BadgeProps, ALL_TIME_SLOTS, ButtonProps (+6 more)
+Nodes (7): metadata, metadata, metadata, metadata, metadata, metadata, next
 
 ### Community 23 - "getSupabaseAdmin"
 Cohesion: 0.11
-Nodes (44): GET, DELETE, dynamic, GET, AdminGalleryPatchSchema, AdminGalleryPostSchema, DELETE, dynamic (+36 more)
+Nodes (45): DELETE, PATCH, AdminGalleryPatchSchema, AdminGalleryPostSchema, DELETE, dynamic, GET, PATCH (+37 more)
 
 ### Community 24 - "prettier/.prettierrc.json"
 Cohesion: 0.25
@@ -228,16 +213,12 @@ Cohesion: 0.29
 Nodes (7): scripts, build, dev, lint, start, test, type-check
 
 ### Community 29 - "Card"
-Cohesion: 0.21
-Nodes (26): DegerlendirContent(), DegerlendirPage(), GalleryPage(), LoginForm(), LoginPage(), AboutPage(), ServicesPage(), ContactPage() (+18 more)
+Cohesion: 0.28
+Nodes (16): DegerlendirContent(), DegerlendirPage(), GalleryPage(), AboutPage(), ServicesPage(), KvkkPage(), ProfilePage(), FloatingActions (+8 more)
 
 ### Community 30 - "ui/tsconfig.json"
 Cohesion: 0.29
 Nodes (6): compilerOptions, paths, extends, include, @yildiz/types, @yildiz/config/tsconfig/react-library.json
-
-### Community 32 - "inventory.service.ts"
-Cohesion: 0.29
-Nodes (6): InventoryInsert, InventoryRow, InventoryUpdate, SupplierInsert, SupplierRow, SupplierUpdate
 
 ### Community 33 - "config/package.json"
 Cohesion: 0.33
@@ -247,12 +228,8 @@ Nodes (5): exports, main, name, private, version
 Cohesion: 0.50
 Nodes (3): 1. Temel Rol Ayrımı ve Sorumluluklar, 2. Standart İş Akışı Döngüsü, Antigravity Direktör & Claude İcracı Çalışma Kuralı
 
-### Community 36 - "AdminTopbar.tsx"
-Cohesion: 0.39
-Nodes (5): AdminDrawerProps, AdminFixedFooterProps, AdminSidebarProps, AdminTab, AdminTopbarProps
-
 ### Community 37 - "ref_vitest"
-Cohesion: 0.11
+Cohesion: 0.12
 Nodes (10): nextConfig, metadata, metadata, metadata, metadata, metadata, robots(), sitemap() (+2 more)
 
 ### Community 38 - "auth-context.tsx"
@@ -273,7 +250,7 @@ Nodes (3): graphify, Use Graphify before grep, Şartnameye Zorunlu Bağlılık K
 
 ### Community 50 - "content-management.test.ts"
 Cohesion: 0.14
-Nodes (19): INITIAL_MOCK_APPOINTMENTS, INITIAL_MOCK_PAYMENTS, MOCK_GALLERY, MOCK_REVIEWS, MOCK_SERVICES, MOCK_STAFF, MOCK_STOCK_ITEMS, MOCK_SUPPLIERS (+11 more)
+Nodes (20): SALON_INFO, INITIAL_MOCK_APPOINTMENTS, INITIAL_MOCK_PAYMENTS, MOCK_GALLERY, MOCK_REVIEWS, MOCK_SERVICES, MOCK_STAFF, MOCK_STOCK_ITEMS (+12 more)
 
 ### Community 51 - "api-appointments.test.ts"
 Cohesion: 0.22
@@ -284,16 +261,16 @@ Cohesion: 0.07
 Nodes (26): concurrency, cancel-in-progress, group, NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL, jobs, quality (+18 more)
 
 ### Community 53 - "Button"
-Cohesion: 0.24
-Nodes (16): HomePage(), AboutCollageSection(), AboutCollageSectionProps, AppointmentTracker(), Hero(), HeroProps, ReviewsSection(), getServiceIcon() (+8 more)
+Cohesion: 0.17
+Nodes (23): HomePage(), RandevuContent(), RandevuPage(), AboutCollageSection(), AboutCollageSectionProps, AppointmentTracker(), Hero(), HeroProps (+15 more)
 
-### Community 54 - "admin/appointments/route.ts"
+### Community 54 - "Database"
 Cohesion: 0.15
-Nodes (20): AdminAppointmentPatchSchema, DELETE, dynamic, PATCH, dynamic, GET, handleGet(), handlePost() (+12 more)
+Nodes (14): dynamic, GET, handleGet(), POST, PUT, AuditLogInput, RouteHandler, AppointmentSource (+6 more)
 
-### Community 55 - "database.types.ts"
-Cohesion: 0.33
-Nodes (5): AppointmentSource, AppointmentStatus, LoyaltyTransactionType, PaymentMethod, UserRole
+### Community 57 - "ref_vitest"
+Cohesion: 0.17
+Nodes (3): ReviewsSectionProps, ALL_TIME_SLOTS, CustomerReview
 
 ### Community 58 - "middleware.test.ts"
 Cohesion: 0.17
@@ -304,15 +281,11 @@ Cohesion: 0.18
 Nodes (11): metadata, RootLayout(), salonJsonLd, AppBootstrapper(), NavigationProgressBar(), Toaster(), ContentProvider(), useToastStore (+3 more)
 
 ### Community 61 - "upload/route.ts"
-Cohesion: 0.21
-Nodes (10): ALLOWED_FOLDERS, ALLOWED_IMAGE_TYPES, ALLOWED_VIDEO_TYPES, AllowedFolder, dynamic, isAllowedFolder(), MIME_TO_EXT, POST (+2 more)
-
-### Community 63 - "content.service.ts"
-Cohesion: 0.20
-Nodes (9): GalleryInsert, GalleryRow, GalleryRowWithCounts, GalleryUpdate, ReviewInsert, ReviewRow, ReviewUpdate, SiteSettingsRow (+1 more)
+Cohesion: 0.10
+Nodes (16): ALLOWED_FOLDERS, ALLOWED_IMAGE_TYPES, ALLOWED_VIDEO_TYPES, AllowedFolder, dynamic, isAllowedFolder(), MIME_TO_EXT, POST (+8 more)
 
 ### Community 64 - "next"
-Cohesion: 0.14
+Cohesion: 0.15
 Nodes (22): checkBusinessHours(), dynamic, NormalizedAppointmentSchema, POST(), RawAppointmentBodySchema, WorkingHoursCheck, dynamic, GalleryCommentPostSchema (+14 more)
 
 ### Community 66 - "updates"
@@ -320,8 +293,8 @@ Cohesion: 0.25
 Nodes (7): interval, updates, directory, open-pull-requests-limit, package-ecosystem, schedule, version
 
 ### Community 71 - "content-context.tsx"
-Cohesion: 0.23
-Nodes (16): ReviewsSectionProps, ContentContext, ContentContextType, DEFAULT_BOOKING_RULES, DEFAULT_PAGE_TEXTS, DEFAULT_SPECIAL_DAYS, SALON_INFO, AppState (+8 more)
+Cohesion: 0.29
+Nodes (13): ContentContext, ContentContextType, DEFAULT_BOOKING_RULES, DEFAULT_PAGE_TEXTS, DEFAULT_SPECIAL_DAYS, AppState, BookingRules, GalleryItem (+5 more)
 
 ### Community 73 - "expire-appointments/route.ts"
 Cohesion: 0.33
@@ -337,23 +310,23 @@ Nodes (6): ToastItem, ToastState, ToastType, GetState, SetState, { channelListen
 
 ## Knowledge Gaps
 - **6 isolated node(s):** `@yildiz/config/tsconfig/nextjs.json`, `./base.json`, `./base.json`, `RFC-4122`, `@yildiz/config/tsconfig/base.json` (+1 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 512 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 513 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `next` connect `Card` to `web/package.json`, `admin/page.tsx`, `api-guard.test.ts`, `web/package.json`, `3. Güvenlik Bulguları`, `sync-google-reviews/route.ts`, `ui/src/index.ts`, `getSupabaseAdmin`, `AdminTopbar.tsx`, `ref_vitest`, `Button`, `admin/appointments/route.ts`, `middleware.test.ts`, `app/layout.tsx`, `upload/route.ts`, `next`, `galeri/layout.tsx`, `hakkimizda/layout.tsx`, `randevu/layout.tsx`, `expire-appointments/route.ts`?**
-  _High betweenness centrality (0.149) - this node is a cross-community bridge._
+- **Why does `next` connect `ui/src/index.ts` to `next`, `ui/src/index.ts`, `ui/src/index.ts`, `ref_vitest`, `web/package.json`, `expire-appointments/route.ts`, `admin/appointments/route.ts`, `web/package.json`, `giris/page.tsx`, `sync-google-reviews/route.ts`, `Card`, `Button`, `Database`, `getSupabaseAdmin`, `middleware.test.ts`, `app/layout.tsx`, `upload/route.ts`?**
+  _High betweenness centrality (0.150) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `getSupabaseAdmin()` (e.g. with `api-appointments.test.ts` and `Y2 – Herkese açık formlarda hız sınırı ve bot koruması yok`) actually correct?**
   _`getSupabaseAdmin()` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `@yildiz/config/tsconfig/nextjs.json`, `./base.json`, `./base.json` to the rest of the system?**
   _6 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `content.service.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.04846938775510204 - nodes in this community are weakly interconnected._
+- **Why does `withStaffOrAdminAuth()` connect `admin/appointments/route.ts` to `ref_vitest`, `4. Orta`, `3. Güvenlik Bulguları`, `Database`, `getSupabaseAdmin`, `upload/route.ts`?**
+  _High betweenness centrality (0.035) - this node is a cross-community bridge._
 - **Should `types/src/index.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.056910569105691054 - nodes in this community are weakly interconnected._
-- **Why does `getSupabaseAdmin()` connect `getSupabaseAdmin` to `next`, `4. Orta`, `expire-appointments/route.ts`, `api-guard.test.ts`, `3. Güvenlik Bulguları`, `sync-google-reviews/route.ts`, `api-appointments.test.ts`, `admin/appointments/route.ts`, `upload/route.ts`?**
-  _High betweenness centrality (0.034) - this node is a cross-community bridge._
-- **Should `ServiceItem` be split into smaller, more focused modules?**
-  _Cohesion score 0.12477718360071301 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05537098560354374 - nodes in this community are weakly interconnected._
 - **Why does `Yıldız Bayan Kuaförü – Ayrıntılı Kod Denetim Raporu` connect `4. Orta` to `ref_vitest`?**
   _High betweenness centrality (0.032) - this node is a cross-community bridge._

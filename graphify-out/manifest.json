@@ -384,9 +384,9 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1793279009.2930028,
-    "seen": 1793279540.569971,
-    "ast_hash": "17d3e946c35792824125e27c7e76fd07",
+    "mtime": 1793279851.1101103,
+    "seen": 1793280000.3419292,
+    "ast_hash": "e4c9f30fe9719779e66676ae9d54ea0e",
     "semantic_hash": ""
   },
   "packages/config/eslint/base.js": {

@@ -115,14 +115,30 @@ describe("Next.js Middleware: Auth & Role Koruması", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
-  it("Genel sayfalarda (/hizmetler) oturumsuz olsa dahi geçişe izin verir", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
-
+  it("Genel sayfalarda (/hizmetler) sb-* çerezi yoksa supabase.auth.getUser() ağ çağrısını atlar ve doğrudan geçişe izin verir (P-1)", async () => {
     const req = new NextRequest("http://localhost/hizmetler");
     const res = await middleware(req);
 
     expect(res.status).toBe(200);
     expect(res.headers.get("location")).toBeNull();
+    expect(mockGetUser).not.toHaveBeenCalled();
+  });
+
+  it("Genel sayfalarda (/hizmetler) sb-* oturum çerezi varsa oturumu tazelemek için supabase.auth.getUser() çağırır (P-1)", async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "user-123" } },
+      error: null,
+    });
+
+    const req = new NextRequest("http://localhost/hizmetler", {
+      headers: {
+        cookie: "sb-project-auth-token=mock-token-value",
+      },
+    });
+    const res = await middleware(req);
+
+    expect(res.status).toBe(200);
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
   });
 
   it("/api/* rotalarında gereksiz supabase.auth.getUser() ağ turunu atlar ve doğrudan geçişe izin verir", async () => {

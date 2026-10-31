@@ -13,13 +13,16 @@ import type {
   GalleryItem,
 } from "@yildiz/types";
 import { generateSafeUUID } from "@yildiz/types";
-import { AdminDashboard } from "@yildiz/ui";
 import { AdminTopbar, type AdminTab } from "@/components/admin/AdminTopbar";
 import { AdminDrawer } from "@/components/admin/AdminDrawer";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminFixedFooter } from "@/components/admin/AdminFixedFooter";
 import { PageLoader } from "@/components/PageLoader";
 
+const AdminDashboard = dynamic(
+  () => import("@yildiz/ui").then((m) => m.AdminDashboard),
+  { loading: () => <PageLoader /> },
+);
 const AppointmentManager = dynamic(
   () => import("@yildiz/ui").then((m) => m.AppointmentManager),
   { loading: () => <PageLoader /> },

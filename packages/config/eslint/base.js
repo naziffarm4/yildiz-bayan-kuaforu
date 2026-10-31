@@ -22,6 +22,7 @@ module.exports = {
       },
     ],
     "no-console": ["warn", { allow: ["warn", "error"] }],
+    "no-empty": ["error", { allowEmptyCatch: false }],
   },
   ignorePatterns: [
     "node_modules/",

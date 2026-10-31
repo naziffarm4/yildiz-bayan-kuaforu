@@ -15,6 +15,17 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  const isProtectedRoute =
+    pathname.startsWith("/admin") || pathname.startsWith("/profil");
+  const hasSupabaseSessionCookie = request.cookies
+    .getAll()
+    .some((cookie) => cookie.name.startsWith("sb-"));
+
+  // P-1: Korumalı olmayan rotalarda ve sb-* oturum çerezi yokken gereksiz auth.getUser() ağ turunu atla
+  if (!isProtectedRoute && !hasSupabaseSessionCookie) {
+    return response;
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

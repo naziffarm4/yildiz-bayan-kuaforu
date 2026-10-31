@@ -44,6 +44,11 @@ vi.mock("@/lib/auth/api-guard", () => ({
   withStaffOrAdminAuth: (handler: RouteHandler) => handler,
   withAdminAuth: (handler: RouteHandler) => handler,
   withRole: (_roles: readonly string[], handler: RouteHandler) => handler,
+  getRequestAuthContext: () => ({
+    userId: "auth-user-123",
+    role: "Admin",
+    ipAddress: "127.0.0.1",
+  }),
 }));
 
 interface MockQueryChain extends Promise<{ data: Array<{ id: string; begeni_sayisi: number }>; error: null }> {

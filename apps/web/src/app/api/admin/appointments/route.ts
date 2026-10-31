@@ -3,8 +3,11 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { withAdminAuth, withStaffOrAdminAuth } from "@/lib/auth/api-guard";
+import {
+  getRequestAuthContext,
+  withAdminAuth,
+  withStaffOrAdminAuth,
+} from "@/lib/auth/api-guard";
 import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
 import { recordAuditLog } from "@/lib/audit-log";
 import {
@@ -152,16 +155,8 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
       return NextResponse.json({ error: "Geçersiz tarih ve saat formatı." }, { status: 400 });
     }
 
-    let actorId: string | null = null;
-    try {
-      const authClient = await createClient();
-      const {
-        data: { user },
-      } = await authClient.auth.getUser();
-      actorId = user?.id ?? null;
-    } catch {
-      actorId = null;
-    }
+    const authCtx = getRequestAuthContext(request);
+    const actorId = authCtx?.userId ?? null;
 
     const insertPayload = {
       id: body.id || generateSafeUUID(),
@@ -190,6 +185,8 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
 
     await recordAuditLog({
       actorId,
+      actorRole: authCtx?.role ?? null,
+      ipAddress: authCtx?.ipAddress ?? null,
       action: "appointment.create",
       entityType: "appointments",
       entityId: data.id,
@@ -229,16 +226,8 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
       notlar,
     } = parsed.data;
 
-    let actorId: string | null = null;
-    try {
-      const authClient = await createClient();
-      const {
-        data: { user },
-      } = await authClient.auth.getUser();
-      actorId = user?.id ?? null;
-    } catch {
-      actorId = null;
-    }
+    const authCtx = getRequestAuthContext(request);
+    const actorId = authCtx?.userId ?? null;
 
     const updates: {
       durum?: AppointmentStatus;
@@ -284,6 +273,8 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
 
     await recordAuditLog({
       actorId,
+      actorRole: authCtx?.role ?? null,
+      ipAddress: authCtx?.ipAddress ?? null,
       action: "appointment.update",
       entityType: "appointments",
       entityId: id,

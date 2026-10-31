@@ -40,7 +40,7 @@ export async function fetchUserProfile(
   try {
     const { data: profile, error } = await client
       .from("profiles")
-      .select("*")
+      .select("id, ad, soyad, telefon, eposta, rol, toplam_puan, sms_dogrulandi")
       .eq("id", userId)
       .maybeSingle();
 
@@ -144,7 +144,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const supabase = createClient();
       const { data, error } = await supabase
         .from("appointments")
-        .select("*")
+        .select(
+          "id, musteri_id, musteri_ad_soyad, musteri_telefon, hizmet_idleri, calisan_idleri, tarih_saat, toplam_sure_dakika, durum, kaynak, notlar, onaylayan_id, olusturulma_tarihi"
+        )
         .eq("musteri_id", currentUser.id)
         .order("tarih_saat", { ascending: false });
 

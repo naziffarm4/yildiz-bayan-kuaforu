@@ -42,23 +42,51 @@ const AdminSupplierPatchSchema = z.object({
   adres: z.string().trim().max(500).nullable().optional(),
 });
 
-export const GET = withStaffOrAdminAuth(async () => {
+export const GET = withStaffOrAdminAuth(async (request?: Request) => {
   try {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return safeErrorResponse("Supabase bağlantısı eksik.", 500);
     }
 
-    const { data, error } = await supabase
+    const url = new URL(request?.url || "http://localhost/api/admin/suppliers");
+    const rawLimit = Number(url.searchParams.get("limit") ?? 200);
+    const rawOffset = Number(url.searchParams.get("offset") ?? 0);
+    const limit =
+      Number.isFinite(rawLimit) && rawLimit > 0
+        ? Math.min(Math.trunc(rawLimit), 500)
+        : 200;
+    const offset =
+      Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.trunc(rawOffset) : 0;
+
+    let query = supabase
       .from("suppliers")
       .select("*")
       .order("firma_adi", { ascending: true });
+
+    const dynamicQuery = query as unknown as {
+      range?: (from: number, to: number) => typeof query;
+    };
+    if (typeof dynamicQuery.range === "function") {
+      query = dynamicQuery.range(offset, offset + limit - 1);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       return safeErrorResponse("Tedarikçiler getirilemedi.", 500, error);
     }
 
-    return NextResponse.json({ success: true, data: data ?? [] });
+    const rows = data ?? [];
+    return NextResponse.json({
+      success: true,
+      data: rows,
+      pagination: {
+        limit,
+        offset,
+        count: rows.length,
+      },
+    });
   } catch (err: unknown) {
     return safeErrorResponse("Sunucu hatası.", 500, err);
   }

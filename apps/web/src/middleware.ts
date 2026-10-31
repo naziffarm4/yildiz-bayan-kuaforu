@@ -30,6 +30,11 @@ export async function middleware(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    if (isProtectedRoute) {
+      const configErrorUrl = new URL("/giris", request.url);
+      configErrorUrl.searchParams.set("error", "configuration");
+      return NextResponse.redirect(configErrorUrl);
+    }
     return response;
   }
 

@@ -218,4 +218,18 @@ describe("Next.js Middleware: Auth & Role Koruması", () => {
     expect(location).toContain("error=unauthorized");
     warnSpy.mockRestore();
   });
+
+  it("ortam değişkenleri (NEXT_PUBLIC_SUPABASE_URL) eksikken /admin ve /profil rotalarında fail-closed olarak /giris?error=configuration yönlendirmesi yapar (Bölüm 2.7)", async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    const adminReq = new NextRequest("http://localhost/admin");
+    const adminRes = await middleware(adminReq);
+    expect(adminRes.status).toBe(307);
+    expect(adminRes.headers.get("location")).toContain("/giris?error=configuration");
+
+    const profilReq = new NextRequest("http://localhost/profil");
+    const profilRes = await middleware(profilReq);
+    expect(profilRes.status).toBe(307);
+    expect(profilRes.headers.get("location")).toContain("/giris?error=configuration");
+  });
 });

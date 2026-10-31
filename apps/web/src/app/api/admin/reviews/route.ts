@@ -83,6 +83,7 @@ export const POST = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "review.create",
       entityType: "customer_reviews",
       entityId: data?.id ?? null,
@@ -121,6 +122,7 @@ export const DELETE = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "review.delete",
       entityType: "customer_reviews",
       entityId: id,
@@ -165,6 +167,7 @@ export const PATCH = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "review.update",
       entityType: "customer_reviews",
       entityId: id,

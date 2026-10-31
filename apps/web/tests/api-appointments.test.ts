@@ -357,36 +357,32 @@ describe("Public Appointments API Route (/api/appointments)", () => {
     expect(json.error).not.toContain("secret_column_constraint_violation_xyz");
   });
 
-  it("yeni misafir profili oluşturulurken sms_dogrulandi: false olarak kaydeder (S6)", async () => {
-    let profileInsertPayload: Record<string, unknown> | null = null;
+  it("oturumsuz istekte telefonla profil aramaz veya sahte profil oluşturmaz; musteri_id = null olarak kaydeder (Bölüm 2.8 & 4.3)", async () => {
+    let appointmentInsertPayload: Record<string, unknown> | null = null;
+    const profileInsertSpy = vi.fn();
+    const profileSelectSpy = vi.fn();
 
     mockFrom.mockImplementation(
       buildMockFrom((table: string) => {
         if (table === "profiles") {
           return {
+            select: profileSelectSpy,
+            insert: profileInsertSpy,
+          };
+        }
+        if (table === "appointments") {
+          return {
             insert: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
-              profileInsertPayload = payload;
+              appointmentInsertPayload = payload;
               return {
                 select: vi.fn().mockReturnValue({
                   single: vi.fn().mockResolvedValue({
-                    data: { id: "new-guest-uuid" },
+                    data: { id: "app-uuid-guest", ...payload },
                     error: null,
                   }),
                 }),
               };
             }),
-          };
-        }
-        if (table === "appointments") {
-          return {
-            insert: vi.fn().mockImplementation((payload: Record<string, unknown>) => ({
-              select: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: { id: "app-uuid-guest", ...payload },
-                  error: null,
-                }),
-              }),
-            })),
           };
         }
         return null;
@@ -407,44 +403,29 @@ describe("Public Appointments API Route (/api/appointments)", () => {
 
     const res = await POST(req);
     expect(res.status).toBe(201);
-    expect(profileInsertPayload).not.toBeNull();
-    if (profileInsertPayload) {
-      expect(profileInsertPayload["sms_dogrulandi"]).toBe(false);
+    expect(profileSelectSpy).not.toHaveBeenCalled();
+    expect(profileInsertSpy).not.toHaveBeenCalled();
+    expect(appointmentInsertPayload).not.toBeNull();
+    if (appointmentInsertPayload) {
+      expect(appointmentInsertPayload["musteri_id"]).toBeNull();
     }
   });
 
-  it("profil oluşturulurken hata çıksa bile randevuyu musteri_id = null olarak başarıyla kaydeder", async () => {
-    let appointmentInsertPayload: Record<string, unknown> | null = null;
-
+  it("veritabanı unique kısıtı ihlalinde (23505) 500 yerine 409 Conflict döner (Bölüm 2.8)", async () => {
     mockFrom.mockImplementation(
       buildMockFrom((table: string) => {
-        if (table === "profiles") {
+        if (table === "appointments") {
           return {
             insert: vi.fn().mockReturnValue({
               select: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
                   data: null,
-                  error: { message: "profiles_id_fkey violation" },
+                  error: {
+                    code: "23505",
+                    message: "duplicate key value violates unique constraint idx_appointments_active_phone_time",
+                  },
                 }),
               }),
-            }),
-          };
-        }
-        if (table === "appointments") {
-          return {
-            insert: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
-              appointmentInsertPayload = payload;
-              return {
-                select: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue({
-                    data: {
-                      id: "app-uuid-guest",
-                      ...payload,
-                    },
-                    error: null,
-                  }),
-                }),
-              };
             }),
           };
         }
@@ -465,14 +446,10 @@ describe("Public Appointments API Route (/api/appointments)", () => {
     });
 
     const res = await POST(req);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(409);
     const json = await res.json();
-    expect(json.success).toBe(true);
-    expect(appointmentInsertPayload).not.toBeNull();
-    if (appointmentInsertPayload) {
-      expect(appointmentInsertPayload["musteri_id"]).toBeNull();
-      expect(typeof appointmentInsertPayload["kvkk_onay_tarihi"]).toBe("string");
-    }
+    expect(json.success).toBe(false);
+    expect(json.error).toContain("aktif bir randevu");
   });
 
   it("kvkk_onay / kvkkOnay true gönderildiğinde kabul eder ve kvkk_onay_tarihi kaydeder (O8, YN-7)", async () => {
@@ -790,76 +767,5 @@ describe("Public Appointments API Route (/api/appointments)", () => {
     });
     const afterSpecialRes = await POST(afterSpecialHoursReq);
     expect(afterSpecialRes.status).toBe(400);
-  });
-
-  it("oturumsuz istekte mevcut doğrulanmamış misafir profilini yeniden kullanır (O-4)", async () => {
-    let insertedAppointmentPayload: Record<string, unknown> | null = null;
-    const profileInsertSpy = vi.fn();
-
-    mockFrom.mockImplementation(
-      buildMockFrom((table: string) => {
-        if (table === "profiles") {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  is: vi.fn().mockReturnValue({
-                    maybeSingle: vi.fn().mockResolvedValue({
-                      data: { id: "existing-guest-profile-id" },
-                      error: null,
-                    }),
-                  }),
-                }),
-              }),
-            }),
-            insert: profileInsertSpy,
-          };
-        }
-        if (table === "appointments") {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  in: vi.fn().mockReturnValue({
-                    limit: vi.fn().mockReturnValue({
-                      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-                    }),
-                  }),
-                }),
-              }),
-            }),
-            insert: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
-              insertedAppointmentPayload = payload;
-              return {
-                select: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue({
-                    data: { id: "app-reused-guest", ...payload },
-                    error: null,
-                  }),
-                }),
-              };
-            }),
-          };
-        }
-        return null;
-      })
-    );
-
-    const req = new Request("http://localhost/api/appointments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        musteri_ad_soyad: "Tekrar Gelen Misafir",
-        musteri_telefon: "0532 555 66 77",
-        hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-11-05T14:00:00+03:00",
-        kvkkOnay: true,
-      }),
-    });
-
-    const res = await POST(req);
-    expect(res.status).toBe(201);
-    expect(profileInsertSpy).not.toHaveBeenCalled();
-    expect(insertedAppointmentPayload?.["musteri_id"]).toBe("existing-guest-profile-id");
   });
 });

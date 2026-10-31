@@ -184,6 +184,7 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       actorId,
       actorRole: authCtx?.role ?? null,
       ipAddress: authCtx?.ipAddress ?? null,
@@ -272,6 +273,7 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       actorId,
       actorRole: authCtx?.role ?? null,
       ipAddress: authCtx?.ipAddress ?? null,
@@ -313,6 +315,7 @@ export const DELETE = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "appointment.delete",
       entityType: "appointments",
       entityId: id,

@@ -93,6 +93,7 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "inventory.create",
       entityType: "inventory",
       entityId: data?.id ?? null,
@@ -135,6 +136,7 @@ export const DELETE = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "inventory.delete",
       entityType: "inventory",
       entityId: id,
@@ -187,6 +189,7 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "inventory.update",
       entityType: "inventory",
       entityId: id,

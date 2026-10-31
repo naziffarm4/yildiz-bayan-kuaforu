@@ -64,12 +64,7 @@ export async function POST(request: Request) {
         .eq("id", randevuId)
         .maybeSingle();
 
-      if (
-        !appointment ||
-        ("durum" in appointment &&
-          appointment.durum !== undefined &&
-          appointment.durum !== "Tamamlandı")
-      ) {
+      if (!appointment || appointment.durum !== "Tamamlandı") {
         return NextResponse.json(
           { error: "Yalnızca tamamlanmış randevular değerlendirilebilir." },
           { status: 400 }
@@ -110,6 +105,13 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
+      const errCode = (error as { code?: string }).code;
+      if (errCode === "23505") {
+        return NextResponse.json(
+          { error: "Bu randevu için daha önce değerlendirme yapılmıştır." },
+          { status: 409 }
+        );
+      }
       return safeErrorResponse("Değerlendirme kaydedilemedi.", 500, error);
     }
 

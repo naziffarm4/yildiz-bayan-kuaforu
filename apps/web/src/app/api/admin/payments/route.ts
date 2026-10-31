@@ -337,6 +337,7 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
           };
 
     await recordAuditLog({
+      request,
       actorId: authCtx?.userId ?? staffId,
       actorRole: authCtx?.role ?? null,
       ipAddress: authCtx?.ipAddress ?? null,
@@ -427,6 +428,7 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       actorId: authCtx?.userId ?? null,
       actorRole: authCtx?.role ?? null,
       ipAddress: authCtx?.ipAddress ?? null,

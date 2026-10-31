@@ -105,6 +105,7 @@ export const POST = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "service.create",
       entityType: "services",
       entityId: data?.id ?? null,
@@ -143,6 +144,7 @@ export const DELETE = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "service.delete",
       entityType: "services",
       entityId: id,
@@ -196,6 +198,7 @@ export const PATCH = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "service.update",
       entityType: "services",
       entityId: id,

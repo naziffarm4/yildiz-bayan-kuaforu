@@ -102,6 +102,7 @@ export const POST = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "gallery.create",
       entityType: "gallery_items",
       entityId: data?.id ?? null,
@@ -140,6 +141,7 @@ export const DELETE = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "gallery.delete",
       entityType: "gallery_items",
       entityId: id,
@@ -194,6 +196,7 @@ export const PATCH = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "gallery.update",
       entityType: "gallery_items",
       entityId: id,

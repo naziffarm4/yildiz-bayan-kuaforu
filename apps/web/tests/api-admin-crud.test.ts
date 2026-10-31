@@ -62,14 +62,20 @@ interface MockQueryChain extends Promise<{ data: Array<{ id: string; begeni_sayi
 vi.mock("@/lib/supabase/admin", () => {
   const createChain = (): MockQueryChain => {
     const basePromise = Promise.resolve({
-      data: [{ id: "mock-uuid", begeni_sayisi: 5 }],
+      data: [{ id: "mock-uuid", begeni_sayisi: 5, durum: "Tamamlandı" }],
       error: null,
     });
     const chain = Object.assign(basePromise, {
       order: vi.fn(),
       eq: vi.fn(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: { id: "mock-uuid", begeni_sayisi: 5 }, error: null }),
-      single: vi.fn().mockResolvedValue({ data: { id: "mock-uuid", begeni_sayisi: 5 }, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { begeni_sayisi: 5, durum: "Tamamlandı" },
+        error: null,
+      }),
+      single: vi.fn().mockResolvedValue({
+        data: { id: "mock-uuid", begeni_sayisi: 5, durum: "Tamamlandı" },
+        error: null,
+      }),
       select: vi.fn(),
     });
     chain.order.mockImplementation(createChain);
@@ -814,6 +820,35 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       expect(res.status).toBe(400);
       const json = await res.json();
       expect(json.error).toContain("Dosya içeriği");
+    });
+
+    it("createSignedUploadUrl isteğinde fileSize eksik veya 5MB üzerindeyse 400 döner (Bölüm 2.4)", async () => {
+      const noSizeReq = new Request("http://localhost/api/admin/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "createSignedUploadUrl",
+          folder: "gallery",
+          fileName: "photo.jpg",
+          mimeType: "image/jpeg",
+        }),
+      });
+      const noSizeRes = await AdminUploadPOST(noSizeReq);
+      expect(noSizeRes.status).toBe(400);
+
+      const overSizeReq = new Request("http://localhost/api/admin/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "createSignedUploadUrl",
+          folder: "gallery",
+          fileName: "photo.jpg",
+          mimeType: "image/jpeg",
+          fileSize: 6 * 1024 * 1024,
+        }),
+      });
+      const overSizeRes = await AdminUploadPOST(overSizeReq);
+      expect(overSizeRes.status).toBe(400);
     });
   });
 

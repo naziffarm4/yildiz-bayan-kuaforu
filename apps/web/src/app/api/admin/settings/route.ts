@@ -142,6 +142,7 @@ async function handlePost(request: Request) {
       }
 
       await recordAuditLog({
+        request,
         action: "site_settings.update",
         entityType: "site_settings",
         entityId: existing.id,

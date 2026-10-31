@@ -5,7 +5,10 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { withStaffOrAdminAuth } from "@/lib/auth/api-guard";
+import {
+  getRequestAuthContext,
+  withStaffOrAdminAuth,
+} from "@/lib/auth/api-guard";
 import { safeErrorResponse } from "@/lib/api-utils";
 import { recordAuditLog } from "@/lib/audit-log";
 
@@ -89,13 +92,22 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
   try {
     const contentType = request.headers.get("content-type") || "";
 
-    // İmzalı Yükleme URL'i Oluşturma Desteği (G-10: Vercel 4.5MB sınırını aşan dosyalar için)
+    // İmzalı Yükleme URL'i Oluşturma Desteği (G-10 & Bölüm 2.4: Vercel 4.5MB sınırını aşan dosyalar için)
     if (contentType.includes("application/json")) {
+      const authCtx = getRequestAuthContext(request);
+      if (authCtx && authCtx.role !== "Admin") {
+        return NextResponse.json(
+          { error: "İmzalı yükleme bağlantısı yalnızca Admin yetkisiyle oluşturulabilir." },
+          { status: 403 }
+        );
+      }
+
       const body = (await request.json().catch(() => ({}))) as {
         action?: unknown;
         folder?: unknown;
         fileName?: unknown;
         mimeType?: unknown;
+        fileSize?: unknown;
       };
 
       if (body.action !== "createSignedUploadUrl") {
@@ -115,6 +127,26 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
       const extension = MIME_TO_EXT[mimeType];
       if (!extension) {
         return NextResponse.json({ error: "Desteklenmeyen dosya türü." }, { status: 400 });
+      }
+
+      const isImage = ALLOWED_IMAGE_TYPES.includes(mimeType);
+      const maxAllowedSize = isImage ? MAX_IMAGE_SIZE : MAX_VIDEO_SIZE;
+      const rawFileSize = Number(body.fileSize);
+      if (!Number.isFinite(rawFileSize) || rawFileSize <= 0) {
+        return NextResponse.json(
+          { error: "Geçerli bir dosya boyutu (fileSize) belirtilmelidir." },
+          { status: 400 }
+        );
+      }
+      if (rawFileSize > maxAllowedSize) {
+        return NextResponse.json(
+          {
+            error: isImage
+              ? "Görsel boyutu 5MB sınırını aşıyor."
+              : "Video boyutu 50MB sınırını aşıyor.",
+          },
+          { status: 400 }
+        );
       }
 
       const rawName = typeof body.fileName === "string" ? body.fileName : "medya";
@@ -139,10 +171,16 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
         .getPublicUrl(storagePath);
 
       await recordAuditLog({
+        request,
         action: "media.signed_upload_url",
         entityType: "storage",
         entityId: storagePath,
-        metadata: { folder: folderInput, mimeType, fileName: uniqueFileName },
+        metadata: {
+          folder: folderInput,
+          mimeType,
+          fileSize: rawFileSize,
+          fileName: uniqueFileName,
+        },
       });
 
       return NextResponse.json({
@@ -237,6 +275,7 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
 
           if (publicUrlData?.publicUrl) {
             await recordAuditLog({
+              request,
               action: "media.upload",
               entityType: "storage",
               entityId: storagePath,
@@ -278,6 +317,7 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     const localUrl = `/uploads/${folder}/${uniqueFileName}`;
 
     await recordAuditLog({
+      request,
       action: "media.upload_local",
       entityType: "storage",
       entityId: storagePath,

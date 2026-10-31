@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from("gallery_comments")
-      .select("*")
+      .select("id, gallery_item_id, musteri_adi, yorum, olusturulma_tarihi")
       .eq("gallery_item_id", galleryId)
       .eq("aktif", true)
       .order("olusturulma_tarihi", { ascending: true });
@@ -94,8 +94,8 @@ export async function POST(request: Request) {
     const galleryId = (parsed.data.galleryId || parsed.data.gallery_item_id)!;
     const yorum = parsed.data.yorum;
 
-    // Müşteri adını öncelikle oturumdaki profil kaydından çöz
-    let musteriAdi = (parsed.data.musteriAdi || parsed.data.musteri_adi || "").trim();
+    // Bölüm 2.10: Kimlik sahteciliğini önlemek için istemciden gelen musteriAdi kullanılmaz; yalnızca doğrulanmış profil veya user_metadata adı kullanılır
+    let musteriAdi = "";
     try {
       const { data: profile } = await supabase
         .from("profiles")
@@ -106,16 +106,19 @@ export async function POST(request: Request) {
       if (profile && typeof profile.ad === "string" && profile.ad.trim()) {
         musteriAdi = `${profile.ad.trim()} ${(profile.soyad || "").trim()}`.trim();
       }
-    } catch {
-      // Profil sorgusu başarısızsa oturum metaverisi veya istemci adına düş
+    } catch (profileErr: unknown) {
+      console.warn("Galeri yorumu profil sorgusu uyarısı:", profileErr);
     }
 
     if (!musteriAdi) {
-      const metaName =
-        (user.user_metadata?.ad as string | undefined) ||
-        (user.user_metadata?.full_name as string | undefined) ||
-        "Değerli Müşterimiz";
-      musteriAdi = metaName.trim();
+      const metaAd = (user.user_metadata?.ad as string | undefined)?.trim() || "";
+      const metaSoyad = (user.user_metadata?.soyad as string | undefined)?.trim() || "";
+      const metaFull =
+        (user.user_metadata?.full_name as string | undefined)?.trim() ||
+        (user.user_metadata?.name as string | undefined)?.trim() ||
+        "";
+      musteriAdi =
+        `${metaAd} ${metaSoyad}`.trim() || metaFull || "Değerli Müşterimiz";
     }
 
     musteriAdi = musteriAdi.slice(0, 100);
@@ -129,7 +132,7 @@ export async function POST(request: Request) {
         yorum,
         aktif: false,
       })
-      .select("*")
+      .select("id, gallery_item_id, musteri_adi, yorum, aktif, olusturulma_tarihi")
       .single();
 
     if (error) {

@@ -443,7 +443,7 @@ export async function POST(request: Request) {
       console.warn("Mükerrer randevu kontrolü atlandı:", dupErr);
     }
 
-    // 3. Müşteri Profili Çözümlemesi (G-06 & O-4: Oturumsuz istekte doğrulanmış hesaba bağlanmaz; varsa mevcut misafir profili yeniden kullanılır)
+    // 3. Müşteri Profili Çözümlemesi (Bölüm 2.8 & 4.3: Oturumsuz isteklerde telefonla profil aranmaz veya sahte/doğrulanmamış profil üretilmez; musteri_id: null kaydedilir)
     let musteriId: string | null = null;
 
     try {
@@ -456,57 +456,6 @@ export async function POST(request: Request) {
       }
     } catch (authErr: unknown) {
       console.warn("Oturum bilgisi okunamadı, misafir akışına devam ediliyor:", authErr);
-    }
-
-    // Oturum yoksa önce aynı telefona ait doğrulanmamış misafir profilini ara, yoksa yeni oluştur (O-4)
-    if (!musteriId) {
-      try {
-        const { data: existingGuest } = await supabaseAdmin
-          .from("profiles")
-          .select("id")
-          .eq("telefon", targetPhone)
-          .eq("sms_dogrulandi", false)
-          .is("eposta", null)
-          .maybeSingle();
-
-        if (existingGuest?.id) {
-          musteriId = existingGuest.id;
-        }
-      } catch (guestLookupErr: unknown) {
-        console.warn("Mevcut misafir profili aranamadı:", guestLookupErr);
-      }
-    }
-
-    if (!musteriId) {
-      const nameParts = musteriAdSoyad.split(" ");
-      const ad = nameParts[0] || musteriAdSoyad;
-      const soyad = nameParts.slice(1).join(" ") || "";
-      const newProfileId = generateSafeUUID();
-
-      try {
-        const { data: newProfile, error: profileError } = await supabaseAdmin
-          .from("profiles")
-          .insert({
-            id: newProfileId,
-            ad,
-            soyad,
-            telefon: targetPhone,
-            rol: "Musteri",
-            toplam_puan: 0,
-            sms_dogrulandi: false,
-          })
-          .select("id")
-          .single();
-
-        if (!profileError && newProfile?.id) {
-          musteriId = newProfile.id;
-        } else {
-          musteriId = null;
-        }
-      } catch (profileCreateErr: unknown) {
-        console.warn("Misafir profili oluşturulamadı:", profileCreateErr);
-        musteriId = null;
-      }
     }
 
     // 4. Randevuyu kaydet (K-7: yalnızca gerekli sütunları döndür)
@@ -531,6 +480,19 @@ export async function POST(request: Request) {
         "id, musteri_id, musteri_ad_soyad, musteri_telefon, hizmet_idleri, calisan_idleri, tarih_saat, toplam_sure_dakika, durum, kaynak, notlar, olusturulma_tarihi"
       )
       .single();
+
+    if (appointmentError) {
+      const errCode = (appointmentError as { code?: string }).code;
+      if (errCode === "23505") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Bu tarih ve saat için zaten aktif bir randevu talebiniz bulunmaktadır.",
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     if (appointmentError || !appointment) {
       return safeErrorResponse(

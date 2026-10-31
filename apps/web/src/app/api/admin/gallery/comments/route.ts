@@ -72,6 +72,7 @@ export const PATCH = withAdminAuth(async (request: Request) => {
     }
 
     await recordAuditLog({
+      request,
       action: "gallery_comment.moderate",
       entityType: "gallery_comments",
       entityId: id,
@@ -112,6 +113,13 @@ export const DELETE = withAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Yorum silinemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      request,
+      action: "gallery_comment.delete",
+      entityType: "gallery_comments",
+      entityId: id,
+    });
 
     return NextResponse.json({
       success: true,

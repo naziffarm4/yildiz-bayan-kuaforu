@@ -84,15 +84,14 @@ export function withRole<TContext = unknown>(
         return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
       }
 
-      const safeRequest = request || new Request("http://localhost");
       const authCtx: ApiAuthContext = {
         userId: user.id,
         role: resolvedRole as AllowedRole,
-        ipAddress: getClientIp(safeRequest),
+        ipAddress: getClientIp(request),
       };
-      requestAuthContextMap.set(safeRequest, authCtx);
+      requestAuthContextMap.set(request, authCtx);
 
-      return await handler(safeRequest, (context ?? (authCtx as unknown as TContext)));
+      return await handler(request, context);
     } catch (err: unknown) {
       console.warn("API Guard yetkilendirme doğrulaması sırasında hata:", err);
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });

@@ -47,19 +47,11 @@ export const GET = withStaffOrAdminAuth(async (request?: Request) => {
     const offset =
       Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.trunc(rawOffset) : 0;
 
-    let query = supabase
+    const { data, error } = await supabase
       .from("customer_reviews")
       .select("*")
-      .order("olusturulma_tarihi", { ascending: false });
-
-    const dynamicQuery = query as unknown as {
-      range?: (from: number, to: number) => typeof query;
-    };
-    if (typeof dynamicQuery.range === "function") {
-      query = dynamicQuery.range(offset, offset + limit - 1);
-    }
-
-    const { data, error } = await query;
+      .order("olusturulma_tarihi", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       return safeErrorResponse("Yorumlar getirilemedi.", 500, error);

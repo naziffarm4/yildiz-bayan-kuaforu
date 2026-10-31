@@ -41,9 +41,11 @@ const { mockSupabase, updatedIds } = vi.hoisted(() => {
       if (table === "appointments") {
         return {
           select: () => ({
-            eq: async () => ({
-              data: pendingRows,
-              error: null,
+            eq: () => ({
+              lt: async () => ({
+                data: pendingRows,
+                error: null,
+              }),
             }),
           }),
           update: () => ({

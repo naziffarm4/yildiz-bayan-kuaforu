@@ -169,20 +169,10 @@ export async function executeGoogleSync(force = false) {
 
     // 4. Gelen Google yorumlarını customer_reviews tablosuna ekle (mükerrer olmadan, toplu insert - P-03)
     if (incomingReviews.length > 0) {
-      const selectQuery = supabase
+      const { data: existingReviews } = await supabase
         .from("customer_reviews")
-        .select("musteri_adi, yorum") as unknown as {
-        limit?: (n: number) => Promise<{
-          data: Array<{ musteri_adi: string; yorum: string | null }> | null;
-        }>;
-      } & Promise<{
-        data: Array<{ musteri_adi: string; yorum: string | null }> | null;
-      }>;
-
-      const { data: existingReviews } =
-        typeof selectQuery.limit === "function"
-          ? await selectQuery.limit(500)
-          : await selectQuery;
+        .select("musteri_adi, yorum")
+        .limit(500);
 
       const existingSet = new Set(
         (existingReviews || []).map(

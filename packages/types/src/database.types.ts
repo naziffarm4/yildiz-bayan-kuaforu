@@ -16,7 +16,7 @@ export type AppointmentStatus =
   | 'Süresi Doldu';
 export type AppointmentSource = 'Web' | 'Telefon' | 'WhatsApp' | 'İşletmeye Geldi';
 export type PaymentMethod = 'Nakit' | 'Kart' | 'Havale_EFT' | 'Veresiye';
-export type LoyaltyTransactionType = 'KAZANIM' | 'HARCAMA' | 'İADE';
+export type LoyaltyTransactionType = 'KAZANIM' | 'HARCAMA' | 'İADE' | 'DUZELTME';
 
 export interface Database {
   public: {
@@ -576,6 +576,42 @@ export interface Database {
         };
         Relationships: [];
       };
+      payment_refunds: {
+        Row: {
+          id: string;
+          payment_id: string;
+          iade_tutari: number;
+          iptal_edilen_bahsis: number;
+          geri_alinan_puan: number;
+          iade_edilen_puan: number;
+          iade_eden_id: string | null;
+          sebep: string | null;
+          olusturulma_tarihi: string;
+        };
+        Insert: {
+          id?: string;
+          payment_id: string;
+          iade_tutari: number;
+          iptal_edilen_bahsis?: number;
+          geri_alinan_puan?: number;
+          iade_edilen_puan?: number;
+          iade_eden_id?: string | null;
+          sebep?: string | null;
+          olusturulma_tarihi?: string;
+        };
+        Update: {
+          id?: string;
+          payment_id?: string;
+          iade_tutari?: number;
+          iptal_edilen_bahsis?: number;
+          geri_alinan_puan?: number;
+          iade_edilen_puan?: number;
+          iade_eden_id?: string | null;
+          sebep?: string | null;
+          olusturulma_tarihi?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -585,6 +621,42 @@ export interface Database {
           p_action?: string;
         };
         Returns: number;
+      };
+      cancel_my_appointment: {
+        Args: {
+          p_appointment_id: string;
+        };
+        Returns: boolean;
+      };
+      record_payment_transaction: {
+        Args: {
+          p_id: string;
+          p_randevu_id: string | null;
+          p_musteri_id: string | null;
+          p_islemi_yapan_calisan_id: string;
+          p_hizmet_adlari: string[];
+          p_toplam_tutar: number;
+          p_odenen_tutar: number;
+          p_indirim_tutari: number;
+          p_kullanilan_puan: number;
+          p_kazanilan_puan: number;
+          p_odeme_yontemi: PaymentMethod;
+          p_bahsis_tutari: number;
+          p_veresiye: boolean;
+          p_gizli_not: string | null;
+        };
+        Returns: Json;
+      };
+      settle_or_refund_payment: {
+        Args: {
+          p_payment_id: string;
+          p_action: string;
+          p_odeme_yontemi?: PaymentMethod;
+          p_actor_id?: string | null;
+          p_earned_points?: number | null;
+          p_sebep?: string | null;
+        };
+        Returns: Json;
       };
     };
     Enums: {

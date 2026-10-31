@@ -57,19 +57,11 @@ export const GET = withStaffOrAdminAuth(async (request?: Request) => {
     const offset =
       Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.trunc(rawOffset) : 0;
 
-    let query = supabase
+    const { data, error } = await supabase
       .from("inventory")
       .select("*, suppliers(firma_adi)")
-      .order("urun_adi", { ascending: true });
-
-    const dynamicQuery = query as unknown as {
-      range?: (from: number, to: number) => typeof query;
-    };
-    if (typeof dynamicQuery.range === "function") {
-      query = dynamicQuery.range(offset, offset + limit - 1);
-    }
-
-    const { data, error } = await query;
+      .order("urun_adi", { ascending: true })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       return safeErrorResponse("Stok listesi getirilemedi.", 500, error);

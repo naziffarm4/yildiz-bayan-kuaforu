@@ -51,9 +51,18 @@ vi.mock("@/lib/auth/api-guard", () => ({
   }),
 }));
 
-interface MockQueryChain extends Promise<{ data: Array<{ id: string; begeni_sayisi: number }>; error: null }> {
+interface MockQueryChain
+  extends Promise<{
+    data: Array<{ id: string; begeni_sayisi: number; durum: string }>;
+    error: null;
+  }> {
   order: ReturnType<typeof vi.fn>;
   eq: ReturnType<typeof vi.fn>;
+  gte: ReturnType<typeof vi.fn>;
+  lte: ReturnType<typeof vi.fn>;
+  lt: ReturnType<typeof vi.fn>;
+  range: ReturnType<typeof vi.fn>;
+  limit: ReturnType<typeof vi.fn>;
   maybeSingle: ReturnType<typeof vi.fn>;
   single: ReturnType<typeof vi.fn>;
   select: ReturnType<typeof vi.fn>;
@@ -68,6 +77,11 @@ vi.mock("@/lib/supabase/admin", () => {
     const chain = Object.assign(basePromise, {
       order: vi.fn(),
       eq: vi.fn(),
+      gte: vi.fn(),
+      lte: vi.fn(),
+      lt: vi.fn(),
+      range: vi.fn(),
+      limit: vi.fn(),
       maybeSingle: vi.fn().mockResolvedValue({
         data: { begeni_sayisi: 5, durum: "Tamamlandı" },
         error: null,
@@ -80,6 +94,11 @@ vi.mock("@/lib/supabase/admin", () => {
     });
     chain.order.mockImplementation(createChain);
     chain.eq.mockImplementation(createChain);
+    chain.gte.mockImplementation(createChain);
+    chain.lte.mockImplementation(createChain);
+    chain.lt.mockImplementation(createChain);
+    chain.range.mockImplementation(createChain);
+    chain.limit.mockImplementation(createChain);
     chain.select.mockImplementation(createChain);
     return chain;
   };

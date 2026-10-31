@@ -74,24 +74,16 @@ export const GET = withStaffOrAdminAuth(async (request: Request) => {
     const offset =
       Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.trunc(rawOffset) : 0;
 
-    let query = supabase
+    const { data, error } = await supabase
       .from("payments")
       .select(PAYMENT_SELECT_COLUMNS)
-      .order("olusturulma_tarihi", { ascending: false });
-
-    const dynamicQuery = query as unknown as {
-      range?: (from: number, to: number) => typeof query;
-    };
-    if (typeof dynamicQuery.range === "function") {
-      query = dynamicQuery.range(offset, offset + limit - 1);
-    }
-
-    const { data, error } = await query;
+      .order("olusturulma_tarihi", { ascending: false })
+      .range(offset, offset + limit - 1);
     if (error) {
       return safeErrorResponse("Ödemeler getirilemedi.", 500, error);
     }
 
-    const rawRows = (data ?? []) as Array<Record<string, unknown>>;
+    const rawRows = data ?? [];
     const rows =
       authCtx?.role === "Calisan"
         ? rawRows.map((row) => ({ ...row, gizli_not: null }))
@@ -180,40 +172,28 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     // Randevu bağlıysa durumunu ve müşteri kimliğini doğrula
     if (appointmentId) {
       try {
-        const apptTable = supabase.from("appointments") as unknown as {
-          select?: (cols: string) => {
-            eq: (col: string, val: string) => {
-              maybeSingle: () => Promise<{
-                data: { id?: string; musteri_id?: string | null; durum?: string } | null;
-                error: unknown;
-              }>;
-            };
-          };
-        };
+        const { data: apptRow } = await supabase
+          .from("appointments")
+          .select("id, musteri_id, durum")
+          .eq("id", appointmentId)
+          .maybeSingle();
 
-        if (typeof apptTable?.select === "function") {
-          const { data: apptRow } = await apptTable
-            .select("id, musteri_id, durum")
-            .eq("id", appointmentId)
-            .maybeSingle();
-
-          if (apptRow?.durum) {
-            if (apptRow.durum === "Tamamlandı") {
-              return NextResponse.json(
-                { error: "Bu randevu için ödeme zaten alınmış." },
-                { status: 409 }
-              );
-            }
-            if (apptRow.durum === "İptal Edildi" || apptRow.durum === "Süresi Doldu") {
-              return NextResponse.json(
-                { error: "İptal edilmiş veya süresi dolmuş randevu için tahsilat yapılamaz." },
-                { status: 400 }
-              );
-            }
+        if (apptRow?.durum) {
+          if (apptRow.durum === "Tamamlandı") {
+            return NextResponse.json(
+              { error: "Bu randevu için ödeme zaten alınmış." },
+              { status: 409 }
+            );
           }
-          if (!customerId && apptRow?.musteri_id) {
-            customerId = apptRow.musteri_id;
+          if (apptRow.durum === "İptal Edildi" || apptRow.durum === "Süresi Doldu") {
+            return NextResponse.json(
+              { error: "İptal edilmiş veya süresi dolmuş randevu için tahsilat yapılamaz." },
+              { status: 400 }
+            );
           }
+        }
+        if (!customerId && apptRow?.musteri_id) {
+          customerId = apptRow.musteri_id;
         }
       } catch (apptLookupErr: unknown) {
         console.warn("Randevu ön kontrolü uyarısı:", apptLookupErr);
@@ -293,17 +273,7 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     const earnedPoints = isVeresiye ? 0 : calculateLoyaltyPoints(netPayable);
 
     // 3. Yalnızca atomik RPC ile tahsilat, sadakat puanı ve randevu durumunu kaydet
-    const rpcClient = supabase as unknown as {
-      rpc: (
-        fn: string,
-        args: Record<string, unknown>
-      ) => Promise<{
-        data: unknown;
-        error: { message?: string; code?: string } | null;
-      }>;
-    };
-
-    const { data: rpcData, error: rpcError } = await rpcClient.rpc(
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
       "record_payment_transaction",
       {
         p_id: paymentId,
@@ -325,8 +295,9 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
 
     if (rpcError) {
       const errMsg = rpcError.message ?? "";
+      const errCode = (rpcError as { code?: string }).code;
       if (
-        rpcError.code === "23505" ||
+        errCode === "23505" ||
         /zaten alınmış|unique/i.test(errMsg)
       ) {
         return NextResponse.json(
@@ -453,17 +424,7 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
       }
     }
 
-    const rpcClient = supabase as unknown as {
-      rpc: (
-        fn: string,
-        args: Record<string, unknown>
-      ) => Promise<{
-        data: unknown;
-        error: { message?: string; code?: string } | null;
-      }>;
-    };
-
-    const { data, error } = await rpcClient.rpc("settle_or_refund_payment", {
+    const { data, error } = await supabase.rpc("settle_or_refund_payment", {
       p_payment_id: id,
       p_action: action,
       p_odeme_yontemi: resolvedMethod,
@@ -474,7 +435,8 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
 
     if (error) {
       const errMsg = error.message ?? "";
-      if (error.code === "23505" || /zaten iade edilmiş/i.test(errMsg)) {
+      const errCode = (error as { code?: string }).code;
+      if (errCode === "23505" || /zaten iade edilmiş/i.test(errMsg)) {
         return NextResponse.json(
           { error: "Bu ödeme zaten iade edilmiş." },
           { status: 409 }

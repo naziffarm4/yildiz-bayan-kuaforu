@@ -74,28 +74,17 @@ export const GET = withStaffOrAdminAuth(async (request: Request) => {
       .select("*")
       .order("tarih_saat", { ascending: false });
 
-    const dynamicQuery = query as unknown as {
-      eq?: (col: string, val: string) => typeof query;
-      gte?: (col: string, val: string) => typeof query;
-      lte?: (col: string, val: string) => typeof query;
-      range?: (from: number, to: number) => typeof query;
-    };
-
-    if (durumParam && AppointmentStatusSchema.safeParse(durumParam).success && typeof dynamicQuery.eq === "function") {
-      query = dynamicQuery.eq("durum", durumParam);
+    const parsedStatus = durumParam ? AppointmentStatusSchema.safeParse(durumParam) : null;
+    if (parsedStatus?.success) {
+      query = query.eq("durum", parsedStatus.data);
     }
-    if (fromParam && typeof dynamicQuery.gte === "function") {
-      query = dynamicQuery.gte("tarih_saat", fromParam);
+    if (fromParam) {
+      query = query.gte("tarih_saat", fromParam);
     }
-    if (toParam && typeof dynamicQuery.lte === "function") {
-      query = dynamicQuery.lte("tarih_saat", toParam);
+    if (toParam) {
+      query = query.lte("tarih_saat", toParam);
     }
-    if (typeof (query as unknown as { range?: unknown }).range === "function") {
-      query = (query as unknown as { range: (from: number, to: number) => typeof query }).range(
-        offset,
-        offset + limit - 1
-      );
-    }
+    query = query.range(offset, offset + limit - 1);
 
     const { data, error } = await query;
 

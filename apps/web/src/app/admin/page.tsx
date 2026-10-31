@@ -59,6 +59,7 @@ const SiteSettingsManager = dynamic(
 import { useContent } from "@/lib/content-context";
 import { useAuth } from "@/lib/auth-context";
 import { useAppStore } from "@/stores/app-store";
+import { toast } from "@/stores/toast-store";
 import { createClient } from "@/lib/supabase/client";
 import {
   AppointmentService,
@@ -425,14 +426,14 @@ export default function AdminPage() {
     }
   };
 
-  const handleCreateAppointment = (created: AppointmentItem) => {
+  const handleCreateAppointment = async (created: AppointmentItem) => {
     setAppointments((prev) => [created, ...prev]);
 
     try {
-      const client = createClient();
-      const appointmentService = new AppointmentService(client);
-      appointmentService
-        .createAppointment({
+      const res = await fetch("/api/admin/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           id: created.id,
           musteri_id: created.musteriId,
           musteri_ad_soyad: created.musteriAdSoyad,
@@ -444,12 +445,18 @@ export default function AdminPage() {
           durum: created.durum,
           kaynak: created.kaynak,
           notlar: created.not ?? null,
-        })
-        .catch((err: unknown) => {
-          console.warn("Randevu veritabanına kaydedilemedi:", err);
-        });
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        setAppointments((prev) => prev.filter((a) => a.id !== created.id));
+        toast.error(json.error || "Randevu kaydedilemedi.");
+      }
     } catch (err: unknown) {
-      console.warn("Randevu oluşturma servisi başlatılamadı:", err);
+      console.error("Randevu oluşturma hatası:", err);
+      setAppointments((prev) => prev.filter((a) => a.id !== created.id));
+      toast.error("Randevu sunucuya kaydedilemedi.");
     }
   };
 

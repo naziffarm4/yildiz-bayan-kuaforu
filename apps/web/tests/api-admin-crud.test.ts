@@ -107,7 +107,7 @@ import { GET as ReviewsGET, POST as ReviewsPOST, DELETE as ReviewsDELETE, PATCH 
 import { GET as ServicesGET, POST as ServicesPOST, DELETE as ServicesDELETE, PATCH as ServicesPATCH } from "../src/app/api/admin/services/route";
 import { GET as InventoryGET, POST as InventoryPOST, DELETE as InventoryDELETE, PATCH as InventoryPATCH } from "../src/app/api/admin/inventory/route";
 import { GET as SuppliersGET, POST as SuppliersPOST, DELETE as SuppliersDELETE, PATCH as SuppliersPATCH } from "../src/app/api/admin/suppliers/route";
-import { GET as AppointmentsGET, PATCH as AppointmentsPATCH, DELETE as AppointmentsDELETE } from "../src/app/api/admin/appointments/route";
+import { GET as AppointmentsGET, POST as AppointmentsPOST, PATCH as AppointmentsPATCH, DELETE as AppointmentsDELETE } from "../src/app/api/admin/appointments/route";
 import { GET as GalleryGET, POST as GalleryPOST, DELETE as GalleryDELETE, PATCH as GalleryPATCH } from "../src/app/api/admin/gallery/route";
 import { GET as AdminGalleryCommentsGET, PATCH as AdminGalleryCommentsPATCH, DELETE as AdminGalleryCommentsDELETE } from "../src/app/api/admin/gallery/comments/route";
 import { POST as GalleryLikePOST } from "../src/app/api/gallery/like/route";
@@ -450,6 +450,41 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
     it("DELETE id eksikse 400 döner", async () => {
       const req = new Request("http://localhost/api/admin/appointments");
       const res = await AppointmentsDELETE(req);
+      expect(res.status).toBe(400);
+    });
+
+    it("POST geçerli verilerle yeni admin/manuel randevu oluşturur (Y2, K-2)", async () => {
+      const req = new Request("http://localhost/api/admin/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          musteri_ad_soyad: "Seda Yıldız",
+          musteri_telefon: "0532 444 55 66",
+          hizmet_idleri: ["srv-1"],
+          calisan_idleri: ["staff-1"],
+          tarih_saat: "2026-11-15T14:00:00+03:00",
+          toplam_sure_dakika: 45,
+          durum: "Onaylandı",
+          kaynak: "Telefon",
+        }),
+      });
+
+      const res = await AppointmentsPOST(req);
+      expect(res.status).toBe(201);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+    });
+
+    it("POST zorunlu alanlar eksikse 400 döner (Y2, K-2)", async () => {
+      const req = new Request("http://localhost/api/admin/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          musteri_ad_soyad: "Seda Yıldız",
+        }),
+      });
+
+      const res = await AppointmentsPOST(req);
       expect(res.status).toBe(400);
     });
 

@@ -201,3 +201,150 @@ REVOKE EXECUTE ON FUNCTION public.settle_or_refund_payment(UUID, TEXT, public.pa
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.settle_or_refund_payment(UUID, TEXT, public.payment_method, UUID, INTEGER, TEXT)
   TO service_role;
+
+-- 3. N5: handle_new_user içinde sahipsiz (musteri_id IS NULL) misafir randevularını doğrulanmış telefona bağlama
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  raw_user_meta JSONB;
+  parsed_first_name TEXT;
+  parsed_last_name TEXT;
+  parsed_phone TEXT;
+  fallback_phone TEXT;
+  full_name TEXT;
+  existing_guest_id UUID;
+  existing_puan INTEGER := 0;
+BEGIN
+  raw_user_meta := COALESCE(new.raw_user_meta_data, '{}'::jsonb);
+
+  parsed_first_name := COALESCE(
+    NULLIF(TRIM(raw_user_meta->>'ad'), ''),
+    NULLIF(TRIM(raw_user_meta->>'first_name'), ''),
+    NULLIF(TRIM(raw_user_meta->>'given_name'), '')
+  );
+
+  parsed_last_name := COALESCE(
+    NULLIF(TRIM(raw_user_meta->>'soyad'), ''),
+    NULLIF(TRIM(raw_user_meta->>'last_name'), ''),
+    NULLIF(TRIM(raw_user_meta->>'family_name'), ''),
+    ''
+  );
+
+  full_name := COALESCE(
+    NULLIF(TRIM(raw_user_meta->>'full_name'), ''),
+    NULLIF(TRIM(raw_user_meta->>'name'), '')
+  );
+
+  IF parsed_first_name IS NULL AND full_name IS NOT NULL THEN
+    IF position(' ' in full_name) > 0 THEN
+      parsed_first_name := split_part(full_name, ' ', 1);
+      parsed_last_name := substring(full_name from position(' ' in full_name) + 1);
+    ELSE
+      parsed_first_name := full_name;
+    END IF;
+  END IF;
+
+  IF parsed_first_name IS NULL OR parsed_first_name = '' THEN
+    parsed_first_name := 'Değerli';
+    parsed_last_name := 'Müşterimiz';
+  END IF;
+
+  fallback_phone := '0599' || lpad(abs(('x' || substr(md5(new.id::text), 1, 8))::bit(32)::bigint % 10000000)::text, 7, '0');
+
+  parsed_phone := COALESCE(
+    NULLIF(TRIM(new.phone), ''),
+    NULLIF(TRIM(raw_user_meta->>'telefon'), ''),
+    NULLIF(TRIM(raw_user_meta->>'phone'), ''),
+    fallback_phone
+  );
+
+  IF new.phone_confirmed_at IS NOT NULL THEN
+    SELECT public.profiles.id, public.profiles.toplam_puan
+    INTO existing_guest_id, existing_puan
+    FROM public.profiles
+    WHERE public.profiles.telefon = parsed_phone
+      AND public.profiles.id <> new.id
+      AND NOT EXISTS (
+        SELECT 1 FROM auth.users u WHERE u.id = public.profiles.id
+      )
+    LIMIT 1;
+
+    IF existing_guest_id IS NOT NULL THEN
+      UPDATE public.profiles
+      SET telefon = 'claimed-' || existing_guest_id::text
+      WHERE id = existing_guest_id;
+    END IF;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.telefon = parsed_phone AND p.id <> new.id
+  ) THEN
+    parsed_phone := fallback_phone;
+  END IF;
+
+  INSERT INTO public.profiles (
+    id,
+    ad,
+    soyad,
+    telefon,
+    eposta,
+    rol,
+    toplam_puan,
+    sms_dogrulandi
+  ) VALUES (
+    new.id,
+    parsed_first_name,
+    parsed_last_name,
+    parsed_phone,
+    new.email,
+    'Musteri',
+    existing_puan,
+    (new.phone_confirmed_at IS NOT NULL)
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    eposta = COALESCE(EXCLUDED.eposta, public.profiles.eposta),
+    telefon = CASE
+      WHEN public.profiles.telefon LIKE '0599%' AND EXCLUDED.telefon NOT LIKE '0599%' THEN EXCLUDED.telefon
+      ELSE public.profiles.telefon
+    END;
+
+  IF existing_guest_id IS NOT NULL THEN
+    UPDATE public.appointments SET musteri_id = new.id WHERE musteri_id = existing_guest_id;
+    UPDATE public.customer_notes SET profile_id = new.id WHERE profile_id = existing_guest_id;
+    UPDATE public.payments SET musteri_id = new.id WHERE musteri_id = existing_guest_id;
+    UPDATE public.loyalty_ledger SET musteri_id = new.id WHERE musteri_id = existing_guest_id;
+    DELETE FROM public.profiles WHERE id = existing_guest_id;
+  END IF;
+
+  IF new.phone_confirmed_at IS NOT NULL THEN
+    UPDATE public.appointments
+    SET musteri_id = new.id
+    WHERE musteri_id IS NULL
+      AND musteri_telefon = parsed_phone;
+  END IF;
+
+  RETURN new;
+END;
+$$;
+
+-- 4. Bölüm 3.1: DB Çalışma Saatleri Varsayılanını Kodla Eşitleme
+ALTER TABLE public.site_settings
+  ALTER COLUMN calisma_saatleri
+  SET DEFAULT '{"haftaIci": "09:00 - 20:00", "cumartesi": "09:00 - 20:30", "pazar": "10:00 - 18:00"}'::jsonb;
+
+UPDATE public.site_settings
+SET calisma_saatleri = '{"haftaIci": "09:00 - 20:00", "cumartesi": "09:00 - 20:30", "pazar": "10:00 - 18:00"}'::jsonb
+WHERE calisma_saatleri->>'pazar' = 'Kapalı';
+
+-- 5. Bölüm 2.2: Veritabanı Tabanlı İdempotency Anahtarı
+ALTER TABLE public.appointments
+  ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_appointments_idempotency_key
+  ON public.appointments (idempotency_key)
+  WHERE idempotency_key IS NOT NULL;

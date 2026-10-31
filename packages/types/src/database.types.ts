@@ -157,6 +157,7 @@ export interface Database {
           onaylayan_id: string | null;
           olusturulma_tarihi: string;
           kvkk_onay_tarihi?: string | null;
+          idempotency_key?: string | null;
         };
         Insert: {
           id?: string;
@@ -173,6 +174,7 @@ export interface Database {
           onaylayan_id?: string | null;
           olusturulma_tarihi?: string;
           kvkk_onay_tarihi?: string | null;
+          idempotency_key?: string | null;
         };
         Update: {
           id?: string;
@@ -189,6 +191,7 @@ export interface Database {
           onaylayan_id?: string | null;
           olusturulma_tarihi?: string;
           kvkk_onay_tarihi?: string | null;
+          idempotency_key?: string | null;
         };
         Relationships: [];
       };

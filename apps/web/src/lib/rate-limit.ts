@@ -1,17 +1,27 @@
 const MAX_BUCKETS = 5000;
+const MAX_FALLBACK_BUCKETS = 250;
 const MAX_IDEMPOTENCY_KEYS = 5000;
 
 const buckets = new Map<string, number[]>();
+const fallbackBuckets = new Map<string, number[]>();
 const idempotencyKeys = new Map<string, number>();
 
-function pruneBuckets(now: number, windowMs: number): void {
+function isFallbackRateKey(key: string): boolean {
+  return key.startsWith("fallback:") || key.includes(":fallback:");
+}
+
+function pruneMapBuckets(
+  store: Map<string, number[]>,
+  now: number,
+  windowMs: number
+): void {
   const windowStart = now - windowMs;
-  for (const [key, timestamps] of buckets.entries()) {
+  for (const [key, timestamps] of store.entries()) {
     const active = timestamps.filter((ts) => ts > windowStart);
     if (active.length === 0) {
-      buckets.delete(key);
+      store.delete(key);
     } else if (active.length !== timestamps.length) {
-      buckets.set(key, active);
+      store.set(key, active);
     }
   }
 }
@@ -49,19 +59,23 @@ export function checkRateLimit(
 ): { allowed: boolean; retryAfterSeconds: number } {
   const now = Date.now();
   const windowStart = now - windowMs;
-  const existing = buckets.get(key) ?? [];
+  const isFallback = isFallbackRateKey(key);
+  const targetStore = isFallback ? fallbackBuckets : buckets;
+  const maxStoreSize = isFallback ? MAX_FALLBACK_BUCKETS : MAX_BUCKETS;
+
+  const existing = targetStore.get(key) ?? [];
   const activeTimestamps = existing.filter((ts) => ts > windowStart);
 
   if (activeTimestamps.length === 0 && existing.length > 0) {
-    buckets.delete(key);
+    targetStore.delete(key);
   }
 
-  if (buckets.size >= MAX_BUCKETS && !buckets.has(key)) {
-    pruneBuckets(now, windowMs);
-    if (buckets.size >= MAX_BUCKETS) {
-      const oldestKey = buckets.keys().next().value;
+  if (targetStore.size >= maxStoreSize && !targetStore.has(key)) {
+    pruneMapBuckets(targetStore, now, windowMs);
+    if (targetStore.size >= maxStoreSize) {
+      const oldestKey = targetStore.keys().next().value;
       if (oldestKey !== undefined) {
-        buckets.delete(oldestKey);
+        targetStore.delete(oldestKey);
       }
     }
   }
@@ -69,12 +83,12 @@ export function checkRateLimit(
   if (activeTimestamps.length >= limit) {
     const oldest = activeTimestamps[0] ?? now;
     const retryAfterSeconds = Math.max(1, Math.ceil((oldest + windowMs - now) / 1000));
-    buckets.set(key, activeTimestamps);
+    targetStore.set(key, activeTimestamps);
     return { allowed: false, retryAfterSeconds };
   }
 
   activeTimestamps.push(now);
-  buckets.set(key, activeTimestamps);
+  targetStore.set(key, activeTimestamps);
   return { allowed: true, retryAfterSeconds: 0 };
 }
 
@@ -107,5 +121,6 @@ export function recordIdempotencyKey(key: string, ttlMs = 10 * 60_000): void {
 
 export function resetRateLimiter(): void {
   buckets.clear();
+  fallbackBuckets.clear();
   idempotencyKeys.clear();
 }

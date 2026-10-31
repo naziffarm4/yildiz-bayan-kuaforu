@@ -21,7 +21,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { POST } from "../src/app/api/appointments/route";
-import { resetRateLimiter } from "../src/lib/rate-limit";
+import { checkRateLimit, resetRateLimiter } from "../src/lib/rate-limit";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 describe("Public Appointments API Route (/api/appointments)", () => {
@@ -767,5 +767,70 @@ describe("Public Appointments API Route (/api/appointments)", () => {
     });
     const afterSpecialRes = await POST(afterSpecialHoursReq);
     expect(afterSpecialRes.status).toBe(400);
+  });
+
+  it("rastgele User-Agent içeren yüzlerce fallback isteği gerçek IP rate-limit kovalarını tahliye edemez (Bölüm 2.2)", () => {
+    const realIpKey = "appointments:203.0.113.10";
+    for (let i = 0; i < 3; i += 1) {
+      expect(checkRateLimit(realIpKey, 3, 60_000).allowed).toBe(true);
+    }
+    expect(checkRateLimit(realIpKey, 3, 60_000).allowed).toBe(false);
+
+    // Saldırgan 500 farklı fallback anahtarı üretse bile gerçek IP kovası silinmez
+    for (let i = 0; i < 500; i += 1) {
+      checkRateLimit(`appointments:fallback:bot-agent-${i}:tr`, 15, 60_000);
+    }
+
+    expect(checkRateLimit(realIpKey, 3, 60_000).allowed).toBe(false);
+  });
+
+  it("Idempotency-Key başlığını veritabanına idempotency_key olarak yazar ve DB 23505 idempotency_key hatasında 409 döner (Bölüm 2.2)", async () => {
+    let insertedPayload: Record<string, unknown> | null = null;
+
+    mockFrom.mockImplementation(
+      buildMockFrom((table: string) => {
+        if (table === "appointments") {
+          return {
+            insert: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+              insertedPayload = payload;
+              return {
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: {
+                      code: "23505",
+                      message:
+                        "duplicate key value violates unique constraint idx_appointments_idempotency_key",
+                    },
+                  }),
+                }),
+              };
+            }),
+          };
+        }
+        return null;
+      })
+    );
+
+    const req = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": "db-idem-key-999",
+      },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Ayşe Yılmaz",
+        musteri_telefon: "0532 123 45 67",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-11-16T10:00:00.000Z",
+        kvkkOnay: true,
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(409);
+    expect(insertedPayload?.["idempotency_key"]).toBe("db-idem-key-999");
+    const json = await res.json();
+    expect(json.error).toContain("zaten işleme alındı");
   });
 });

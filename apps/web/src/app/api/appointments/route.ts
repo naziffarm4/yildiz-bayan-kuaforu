@@ -87,7 +87,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const idempotencyKey = request.headers.get("idempotency-key")?.trim();
+    const rawIdempotencyKey = request.headers.get("idempotency-key")?.trim();
+    const idempotencyKey = rawIdempotencyKey ? rawIdempotencyKey.slice(0, 128) : undefined;
     if (idempotencyKey && isDuplicateIdempotencyKey(idempotencyKey)) {
       return NextResponse.json(
         {
@@ -324,6 +325,7 @@ export async function POST(request: Request) {
         kaynak: "Web",
         notlar,
         kvkk_onay_tarihi: new Date().toISOString(),
+        idempotency_key: idempotencyKey || null,
       })
       .select(
         "id, musteri_id, musteri_ad_soyad, musteri_telefon, hizmet_idleri, calisan_idleri, tarih_saat, toplam_sure_dakika, durum, kaynak, notlar, olusturulma_tarihi"
@@ -332,7 +334,17 @@ export async function POST(request: Request) {
 
     if (appointmentError) {
       const errCode = (appointmentError as { code?: string }).code;
+      const errMsg = (appointmentError as { message?: string }).message ?? "";
       if (errCode === "23505") {
+        if (/idempotency_key/i.test(errMsg)) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Bu randevu talebi zaten işleme alındı.",
+            },
+            { status: 409 }
+          );
+        }
         return NextResponse.json(
           {
             success: false,

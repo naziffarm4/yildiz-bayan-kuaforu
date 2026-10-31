@@ -92,6 +92,11 @@ describe("Public Appointments API Route (/api/appointments)", () => {
                 }),
               }),
             }),
+            in: vi.fn().mockReturnValue({
+              gte: vi.fn().mockReturnValue({
+                lte: vi.fn().mockResolvedValue({ data: [], error: null }),
+              }),
+            }),
           }),
           insert: vi.fn().mockImplementation((payload: Record<string, unknown>) => ({
             select: vi.fn().mockReturnValue({
@@ -832,5 +837,72 @@ describe("Public Appointments API Route (/api/appointments)", () => {
     expect(insertedPayload?.["idempotency_key"]).toBe("db-idem-key-999");
     const json = await res.json();
     expect(json.error).toContain("zaten işleme alındı");
+  });
+
+  it("seçilen saat diliminde eşzamanlı aktif randevu kapasitesi (3) doluysa 409 Conflict döner (Bölüm 4.2)", async () => {
+    mockFrom.mockImplementation(
+      buildMockFrom((table: string) => {
+        if (table === "appointments") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  in: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                    }),
+                  }),
+                }),
+              }),
+              in: vi.fn().mockReturnValue({
+                gte: vi.fn().mockReturnValue({
+                  lte: vi.fn().mockResolvedValue({
+                    data: [
+                      {
+                        id: "active-1",
+                        tarih_saat: "2026-11-16T10:00:00.000Z",
+                        toplam_sure_dakika: 45,
+                        durum: "Onaylandı",
+                      },
+                      {
+                        id: "active-2",
+                        tarih_saat: "2026-11-16T10:15:00.000Z",
+                        toplam_sure_dakika: 45,
+                        durum: "Beklemede",
+                      },
+                      {
+                        id: "active-3",
+                        tarih_saat: "2026-11-16T09:50:00.000Z",
+                        toplam_sure_dakika: 60,
+                        durum: "Onaylandı",
+                      },
+                    ],
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        return null;
+      })
+    );
+
+    const req = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Kapasite Testi",
+        musteri_telefon: "0532 999 00 11",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-11-16T10:00:00.000Z",
+        kvkkOnay: true,
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toContain("tüm uzmanlarımız doludur");
   });
 });

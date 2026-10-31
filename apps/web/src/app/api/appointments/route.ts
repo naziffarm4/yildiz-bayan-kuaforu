@@ -195,10 +195,11 @@ export async function POST(request: Request) {
     // 2. Çalışma Saatleri & Özel Günler Kontrolü (O9, O-6)
     let rawCalismaSaatleri: Record<string, unknown> | null = null;
     let extraSpecialDays: FlexibleSpecialDay[] | undefined;
+    let bufferMinutes = 15;
     try {
       const { data: settingsData } = await supabaseAdmin
         .from("site_settings")
-        .select("calisma_saatleri, sayfa_metinleri")
+        .select("calisma_saatleri, sayfa_metinleri, tampon_sure_dakika")
         .limit(1)
         .maybeSingle();
 
@@ -216,6 +217,10 @@ export async function POST(request: Request) {
         if (Array.isArray(textsObj.specialDays)) {
           extraSpecialDays = textsObj.specialDays as FlexibleSpecialDay[];
         }
+      }
+      const rawBuffer = Number(settingsData?.tampon_sure_dakika);
+      if (Number.isFinite(rawBuffer) && rawBuffer >= 0) {
+        bufferMinutes = rawBuffer;
       }
     } catch (settingsErr: unknown) {
       console.warn("Ayarlar tablosu okunamadı, varsayılan çalışma saatleri kullanılıyor:", settingsErr);
@@ -269,7 +274,7 @@ export async function POST(request: Request) {
     }, 0);
     const computedDuration = totalServiceMinutes > 0 ? totalServiceMinutes : 30;
 
-    // 4. Çifte gönderim / aynı saat ve telefonda aktif randevu çakışma kontrolü
+    // 4. Çifte gönderim / aynı saat ve telefonda aktif randevu çakışma ve kapasite kontrolü (Bölüm 4.2)
     try {
       const existingQuery = supabaseAdmin
         .from("appointments")
@@ -290,8 +295,48 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
+
+      // Aynı gün içindeki aktif randevularla zaman aralığı çakışma / kapasite kontrolü
+      const apptStartMs = apptDate.getTime();
+      const apptEndMs = apptStartMs + (computedDuration + bufferMinutes) * 60_000;
+      const dayStartIso = new Date(apptStartMs - 12 * 60 * 60_000).toISOString();
+      const dayEndIso = new Date(apptStartMs + 12 * 60 * 60_000).toISOString();
+
+      const { data: sameDayActive } = await supabaseAdmin
+        .from("appointments")
+        .select("id, tarih_saat, toplam_sure_dakika, durum")
+        .in("durum", ["Beklemede", "Onaylandı"])
+        .gte("tarih_saat", dayStartIso)
+        .lte("tarih_saat", dayEndIso);
+
+      if (Array.isArray(sameDayActive) && sameDayActive.length > 0) {
+        const MAX_CONCURRENT_APPOINTMENTS = 3;
+        let overlappingCount = 0;
+
+        for (const existing of sameDayActive) {
+          const exStartMs = new Date(existing.tarih_saat).getTime();
+          if (!Number.isFinite(exStartMs)) continue;
+          const exDuration = Number(existing.toplam_sure_dakika ?? 30);
+          const exEndMs = exStartMs + (exDuration + bufferMinutes) * 60_000;
+
+          if (apptStartMs < exEndMs && exStartMs < apptEndMs) {
+            overlappingCount += 1;
+          }
+        }
+
+        if (overlappingCount >= MAX_CONCURRENT_APPOINTMENTS) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                "Seçilen saat diliminde tüm uzmanlarımız doludur, lütfen başka bir saat seçiniz.",
+            },
+            { status: 409 }
+          );
+        }
+      }
     } catch (dupErr: unknown) {
-      console.warn("Mükerrer randevu kontrolü atlandı:", dupErr);
+      console.warn("Mükerrer / kapasite randevu kontrolü atlandı:", dupErr);
     }
 
     // 3. Müşteri Profili Çözümlemesi (Bölüm 2.8 & 4.3: Oturumsuz isteklerde telefonla profil aranmaz veya sahte/doğrulanmamış profil üretilmez; musteri_id: null kaydedilir)

@@ -4,6 +4,7 @@ import React, { useState, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { isValidTrPhone } from "@yildiz/types";
 import { Button, Card, Badge, PasswordInput } from "@yildiz/ui";
 import { useAuth } from "@/lib/auth-context";
 import { safeRedirectPath } from "@/lib/safe-redirect";
@@ -43,12 +44,7 @@ function RegisterForm() {
       return;
     }
 
-    const cleanPhone = telefon.replace(/\D/g, "");
-    const isValidPhone =
-      (cleanPhone.length === 11 && cleanPhone.startsWith("05")) ||
-      (cleanPhone.length === 10 && cleanPhone.startsWith("5"));
-
-    if (!isValidPhone) {
+    if (!isValidTrPhone(telefon)) {
       const err = "Lütfen geçerli bir telefon numarası giriniz (Örn: 05XX XXX XX XX).";
       setError(err);
       toast.error(err);

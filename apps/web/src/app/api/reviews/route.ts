@@ -6,29 +6,22 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
-const PublicReviewBodySchema = z
-  .object({
-    musteri_adi: z.string().trim().max(100).optional(),
-    musteriAdi: z.string().trim().max(100).optional(),
-    puan: z.coerce
-      .number()
-      .int()
-      .min(1, "Puan 1 ile 5 arasında olmalıdır.")
-      .max(5, "Puan 1 ile 5 arasında olmalıdır.")
-      .default(5),
-    yorum: z.string().trim().max(1000, "Yorum en fazla 1000 karakter olabilir.").optional(),
-    hizmet_turu: z.string().trim().max(100).optional(),
-    hizmetTuru: z.string().trim().max(100).optional(),
-    randevu_id: z.string().uuid("Geçersiz randevu kimliği.").nullable().optional(),
-    randevuId: z.string().uuid("Geçersiz randevu kimliği.").nullable().optional(),
-  })
-  .refine(
-    (data) => {
-      const name = (data.musteri_adi || data.musteriAdi || "").trim();
-      return name.length >= 2;
-    },
-    { message: "Lütfen adınızı ve soyadınızı belirtiniz." }
-  );
+const PublicReviewBodySchema = z.object({
+  musteri_adi: z
+    .string({ required_error: "Lütfen adınızı ve soyadınızı belirtiniz." })
+    .trim()
+    .min(2, "Lütfen adınızı ve soyadınızı belirtiniz.")
+    .max(100),
+  puan: z.coerce
+    .number()
+    .int()
+    .min(1, "Puan 1 ile 5 arasında olmalıdır.")
+    .max(5, "Puan 1 ile 5 arasında olmalıdır.")
+    .default(5),
+  yorum: z.string().trim().max(1000, "Yorum en fazla 1000 karakter olabilir.").optional(),
+  hizmet_turu: z.string().trim().max(100).optional(),
+  randevu_id: z.string().uuid("Geçersiz randevu kimliği.").nullable().optional(),
+});
 
 export async function POST(request: Request) {
   try {
@@ -51,11 +44,11 @@ export async function POST(request: Request) {
     }
 
     const body = parsed.data;
-    const musteriAdi = (body.musteri_adi || body.musteriAdi || "").trim();
+    const musteriAdi = body.musteri_adi;
     const puan = body.puan ?? 5;
     const yorum = (body.yorum || "").trim();
-    const hizmetTuru = (body.hizmet_turu || body.hizmetTuru || "Genel Hizmet").trim();
-    const randevuId = body.randevu_id || body.randevuId || null;
+    const hizmetTuru = (body.hizmet_turu || "Genel Hizmet").trim();
+    const randevuId = body.randevu_id || null;
 
     if (randevuId) {
       const { data: appointment } = await supabase

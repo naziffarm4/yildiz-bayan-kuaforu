@@ -8,21 +8,14 @@ import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
 import { recordAuditLog } from "@/lib/audit-log";
 import type { Database } from "@yildiz/types";
 
-const AdminInventoryPostSchema = z
-  .object({
-    urun_adi: z.string().trim().min(1).max(150).optional(),
-    urunAdi: z.string().trim().min(1).max(150).optional(),
-    kategori: z.string({ required_error: "Kategori zorunludur." }).trim().min(1).max(100),
-    miktar: z.coerce.number().int().nonnegative("Stok miktarı negatif olamaz.").default(0),
-    birim: z.string({ required_error: "Birim zorunludur." }).trim().min(1).max(50),
-    kritik_seviye: z.coerce.number().int().nonnegative("Kritik seviye negatif olamaz.").optional(),
-    kritikSeviye: z.coerce.number().int().nonnegative("Kritik seviye negatif olamaz.").optional(),
-    supplier_id: z.string().trim().min(1).nullable().optional(),
-    supplierId: z.string().trim().min(1).nullable().optional(),
-  })
-  .refine((data) => Boolean(data.urun_adi || data.urunAdi), {
-    message: "Ürün adı zorunludur.",
-  });
+const AdminInventoryPostSchema = z.object({
+  urun_adi: z.string({ required_error: "Ürün adı zorunludur." }).trim().min(1).max(150),
+  kategori: z.string({ required_error: "Kategori zorunludur." }).trim().min(1).max(100),
+  miktar: z.coerce.number().int().nonnegative("Stok miktarı negatif olamaz.").default(0),
+  birim: z.string({ required_error: "Birim zorunludur." }).trim().min(1).max(50),
+  kritik_seviye: z.coerce.number().int().nonnegative("Kritik seviye negatif olamaz.").default(5),
+  supplier_id: z.string().trim().min(1).nullable().optional(),
+});
 
 const AdminInventoryPatchSchema = z.object({
   id: z
@@ -30,14 +23,11 @@ const AdminInventoryPatchSchema = z.object({
     .trim()
     .min(1, "ID parametresi gereklidir."),
   urun_adi: z.string().trim().min(1).max(150).optional(),
-  urunAdi: z.string().trim().min(1).max(150).optional(),
   kategori: z.string().trim().min(1).max(100).optional(),
   birim: z.string().trim().min(1).max(50).optional(),
   miktar: z.coerce.number().int().nonnegative("Stok miktarı negatif olamaz.").optional(),
   kritik_seviye: z.coerce.number().int().nonnegative("Kritik seviye negatif olamaz.").optional(),
-  kritikSeviye: z.coerce.number().int().nonnegative("Kritik seviye negatif olamaz.").optional(),
   supplier_id: z.string().trim().min(1).nullable().optional(),
-  supplierId: z.string().trim().min(1).nullable().optional(),
 });
 
 export const GET = withStaffOrAdminAuth(async (request?: Request) => {
@@ -98,12 +88,12 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     const { data, error } = await supabase
       .from("inventory")
       .insert({
-        urun_adi: (body.urun_adi ?? body.urunAdi)!,
+        urun_adi: body.urun_adi,
         kategori: body.kategori,
         miktar: body.miktar,
         birim: body.birim,
-        kritik_seviye: body.kritik_seviye ?? body.kritikSeviye ?? 5,
-        supplier_id: body.supplier_id ?? body.supplierId ?? null,
+        kritik_seviye: body.kritik_seviye,
+        supplier_id: body.supplier_id ?? null,
       })
       .select("*")
       .single();
@@ -118,7 +108,7 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
       entityType: "inventory",
       entityId: data?.id ?? null,
       metadata: {
-        urun_adi: body.urun_adi ?? body.urunAdi,
+        urun_adi: body.urun_adi,
         kategori: body.kategori,
         miktar: body.miktar,
       },
@@ -181,21 +171,15 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     const body = parsed.data;
-    const { id, kritikSeviye } = body;
+    const { id } = body;
 
     const updates: Database["public"]["Tables"]["inventory"]["Update"] = {};
-    if (body.urun_adi !== undefined || body.urunAdi !== undefined) {
-      updates.urun_adi = body.urun_adi ?? body.urunAdi;
-    }
+    if (body.urun_adi !== undefined) updates.urun_adi = body.urun_adi;
     if (body.kategori !== undefined) updates.kategori = body.kategori;
     if (body.birim !== undefined) updates.birim = body.birim;
     if (body.miktar !== undefined) updates.miktar = body.miktar;
-    if (kritikSeviye !== undefined || body.kritik_seviye !== undefined) {
-      updates.kritik_seviye = kritikSeviye ?? body.kritik_seviye;
-    }
-    if (body.supplier_id !== undefined || body.supplierId !== undefined) {
-      updates.supplier_id = body.supplier_id ?? body.supplierId;
-    }
+    if (body.kritik_seviye !== undefined) updates.kritik_seviye = body.kritik_seviye;
+    if (body.supplier_id !== undefined) updates.supplier_id = body.supplier_id;
 
     const { data, error } = await supabase
       .from("inventory")

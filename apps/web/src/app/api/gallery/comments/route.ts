@@ -7,21 +7,18 @@ import { createClient } from "@/lib/supabase/server";
 import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
-const GalleryCommentPostSchema = z
-  .object({
-    galleryId: z.string().trim().min(1).optional(),
-    gallery_item_id: z.string().trim().min(1).optional(),
-    musteriAdi: z.string().trim().max(100).optional(),
-    musteri_adi: z.string().trim().max(100).optional(),
-    yorum: z
-      .string({ required_error: "Yorum metni zorunludur." })
-      .trim()
-      .min(1, "Yorum metni boş olamaz.")
-      .max(500, "Yorum metni en fazla 500 karakter olabilir."),
-  })
-  .refine((data) => Boolean(data.galleryId || data.gallery_item_id), {
-    message: "Galeri öğesi ID zorunludur.",
-  });
+const GalleryCommentPostSchema = z.object({
+  gallery_item_id: z
+    .string({ required_error: "Galeri öğesi ID zorunludur." })
+    .trim()
+    .min(1, "Galeri öğesi ID zorunludur."),
+  musteri_adi: z.string().trim().max(100).optional(),
+  yorum: z
+    .string({ required_error: "Yorum metni zorunludur." })
+    .trim()
+    .min(1, "Yorum metni boş olamaz.")
+    .max(500, "Yorum metni en fazla 500 karakter olabilir."),
+});
 
 export async function GET(request: Request) {
   try {
@@ -91,7 +88,7 @@ export async function POST(request: Request) {
       return safeErrorResponse("Supabase bağlantısı eksik.", 500);
     }
 
-    const galleryId = (parsed.data.galleryId || parsed.data.gallery_item_id)!;
+    const galleryId = parsed.data.gallery_item_id;
     const yorum = parsed.data.yorum;
 
     // Bölüm 2.10: Kimlik sahteciliğini önlemek için istemciden gelen musteriAdi kullanılmaz; yalnızca doğrulanmış profil veya user_metadata adı kullanılır

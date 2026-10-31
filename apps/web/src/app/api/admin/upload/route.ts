@@ -108,7 +108,52 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
         fileName?: unknown;
         mimeType?: unknown;
         fileSize?: unknown;
+        path?: unknown;
       };
+
+      if (body.action === "verifyUploadedObject") {
+        const storagePath = typeof body.path === "string" ? body.path.trim() : "";
+        const mimeType = typeof body.mimeType === "string" ? body.mimeType.toLowerCase() : "";
+        const isImage = ALLOWED_IMAGE_TYPES.includes(mimeType);
+        const isVideo = ALLOWED_VIDEO_TYPES.includes(mimeType);
+
+        if (!storagePath || (!isImage && !isVideo)) {
+          return NextResponse.json(
+            { error: "Geçersiz doğrulama parametreleri." },
+            { status: 400 }
+          );
+        }
+
+        const supabase = getSupabaseAdmin();
+        if (!supabase) {
+          return safeErrorResponse("Medya depolama bağlantısı yapılandırılmamış.", 500);
+        }
+
+        const { data: blobData, error: dlError } = await supabase.storage
+          .from("salon-media")
+          .download(storagePath);
+
+        if (dlError || !blobData) {
+          return safeErrorResponse("Yüklenen dosya doğrulanamadı.", 400, dlError);
+        }
+
+        const maxAllowedSize = isImage ? MAX_IMAGE_SIZE : MAX_VIDEO_SIZE;
+        const arrayBuf = await blobData.arrayBuffer();
+        const fileBuffer = Buffer.from(arrayBuf);
+
+        if (
+          fileBuffer.length > maxAllowedSize ||
+          !verifyMagicBytes(fileBuffer, mimeType)
+        ) {
+          await supabase.storage.from("salon-media").remove([storagePath]);
+          return NextResponse.json(
+            { error: "Yüklenen dosya içeriği veya boyutu geçersiz, dosya silindi." },
+            { status: 400 }
+          );
+        }
+
+        return NextResponse.json({ success: true, verified: true, path: storagePath });
+      }
 
       if (body.action !== "createSignedUploadUrl") {
         return NextResponse.json({ error: "Geçersiz işlem." }, { status: 400 });

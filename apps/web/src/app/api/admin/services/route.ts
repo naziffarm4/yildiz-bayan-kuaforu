@@ -8,26 +8,20 @@ import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
 import { recordAuditLog } from "@/lib/audit-log";
 import type { Database } from "@yildiz/types";
 
-const AdminServicePostSchema = z
-  .object({
-    ad: z.string({ required_error: "Hizmet adı zorunludur." }).trim().min(1).max(150),
-    kategori: z.string({ required_error: "Kategori zorunludur." }).trim().min(1).max(100),
-    tahmini_sure_dakika: z.coerce.number().int().positive("Tahmini süre pozitif olmalıdır.").optional(),
-    tahminiSureDakika: z.coerce.number().int().positive("Tahmini süre pozitif olmalıdır.").optional(),
-    fiyat: z.coerce.number().nonnegative("Fiyat negatif olamaz."),
-    aktif: z.boolean().optional().default(true),
-    aciklama: z.string().max(1000).nullable().optional(),
-    gorsel_url: z.string().max(500).nullable().optional(),
-    gorselUrl: z.string().max(500).nullable().optional(),
-    detay: z.string().max(2000).nullable().optional(),
-    sira: z.coerce.number().int().nonnegative().optional().default(0),
-  })
-  .refine(
-    (data) =>
-      (data.tahmini_sure_dakika !== undefined && data.tahmini_sure_dakika > 0) ||
-      (data.tahminiSureDakika !== undefined && data.tahminiSureDakika > 0),
-    { message: "Geçerli bir tahmini süre (dakika) belirtilmelidir." }
-  );
+const AdminServicePostSchema = z.object({
+  ad: z.string({ required_error: "Hizmet adı zorunludur." }).trim().min(1).max(150),
+  kategori: z.string({ required_error: "Kategori zorunludur." }).trim().min(1).max(100),
+  tahmini_sure_dakika: z.coerce
+    .number({ required_error: "Geçerli bir tahmini süre (dakika) belirtilmelidir." })
+    .int()
+    .positive("Tahmini süre pozitif olmalıdır."),
+  fiyat: z.coerce.number().nonnegative("Fiyat negatif olamaz."),
+  aktif: z.boolean().optional().default(true),
+  aciklama: z.string().max(1000).nullable().optional(),
+  gorsel_url: z.string().max(500).nullable().optional(),
+  detay: z.string().max(2000).nullable().optional(),
+  sira: z.coerce.number().int().nonnegative().optional().default(0),
+});
 
 const AdminServicePatchSchema = z.object({
   id: z
@@ -37,12 +31,10 @@ const AdminServicePatchSchema = z.object({
   ad: z.string().trim().min(1).max(150).optional(),
   kategori: z.string().trim().min(1).max(100).optional(),
   tahmini_sure_dakika: z.coerce.number().int().positive("Tahmini süre pozitif olmalıdır.").optional(),
-  tahminiSureDakika: z.coerce.number().int().positive("Tahmini süre pozitif olmalıdır.").optional(),
   fiyat: z.coerce.number().nonnegative("Fiyat negatif olamaz.").optional(),
   aktif: z.boolean().optional(),
   aciklama: z.string().max(1000).nullable().optional(),
   gorsel_url: z.string().max(500).nullable().optional(),
-  gorselUrl: z.string().max(500).nullable().optional(),
   detay: z.string().max(2000).nullable().optional(),
   sira: z.coerce.number().int().nonnegative().optional(),
 });
@@ -82,18 +74,17 @@ export const POST = withAdminAuth(async (request: Request) => {
     }
 
     const body = parsed.data;
-    const duration = (body.tahmini_sure_dakika ?? body.tahminiSureDakika)!;
 
     const { data, error } = await supabase
       .from("services")
       .insert({
         ad: body.ad,
         kategori: body.kategori,
-        tahmini_sure_dakika: duration,
+        tahmini_sure_dakika: body.tahmini_sure_dakika,
         fiyat: body.fiyat,
         aktif: body.aktif ?? true,
         aciklama: body.aciklama ?? null,
-        gorsel_url: body.gorsel_url ?? body.gorselUrl ?? null,
+        gorsel_url: body.gorsel_url ?? null,
         detay: body.detay ?? null,
         sira: body.sira ?? 0,
       })
@@ -169,19 +160,19 @@ export const PATCH = withAdminAuth(async (request: Request) => {
     }
 
     const body = parsed.data;
-    const { id, tahminiSureDakika } = body;
+    const { id } = body;
 
     const updates: Database["public"]["Tables"]["services"]["Update"] = {};
     if (body.ad !== undefined) updates.ad = body.ad;
     if (body.kategori !== undefined) updates.kategori = body.kategori;
-    if (tahminiSureDakika !== undefined || body.tahmini_sure_dakika !== undefined) {
-      updates.tahmini_sure_dakika = tahminiSureDakika ?? body.tahmini_sure_dakika;
+    if (body.tahmini_sure_dakika !== undefined) {
+      updates.tahmini_sure_dakika = body.tahmini_sure_dakika;
     }
     if (body.fiyat !== undefined) updates.fiyat = body.fiyat;
     if (body.aktif !== undefined) updates.aktif = body.aktif;
     if (body.aciklama !== undefined) updates.aciklama = body.aciklama;
-    if (body.gorsel_url !== undefined || body.gorselUrl !== undefined) {
-      updates.gorsel_url = body.gorsel_url ?? body.gorselUrl ?? null;
+    if (body.gorsel_url !== undefined) {
+      updates.gorsel_url = body.gorsel_url ?? null;
     }
     if (body.detay !== undefined) updates.detay = body.detay;
     if (body.sira !== undefined) updates.sira = body.sira;

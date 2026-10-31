@@ -12,6 +12,8 @@ import {
   calculateCommission,
   calculateLoyaltyPoints,
   calculateLoyaltyDiscount,
+  extractPhoneDigits,
+  formatTRY,
   generateSafeUUID,
 } from "@yildiz/types";
 import { Card } from "./card";
@@ -248,7 +250,7 @@ export const CashRegisterPOS: React.FC<CashRegisterPOSProps> = ({
 
   const handleSendWhatsApp = () => {
     if (!successReviewModal) return;
-    const cleanPhone = successReviewModal.customerPhone.replace(/\D/g, "");
+    const cleanPhone = extractPhoneDigits(successReviewModal.customerPhone);
     const formattedPhone = cleanPhone.startsWith("90")
       ? cleanPhone
       : cleanPhone.startsWith("0")
@@ -559,7 +561,7 @@ export const CashRegisterPOS: React.FC<CashRegisterPOSProps> = ({
                       Tahsil Edilecek Net Tutar
                     </span>
                     <span className="font-serif text-2xl font-bold text-accent-gold">
-                      {netPayable.toLocaleString("tr-TR")} ₺
+                      {formatTRY(netPayable)}
                     </span>
                   </div>
 
@@ -596,24 +598,24 @@ export const CashRegisterPOS: React.FC<CashRegisterPOSProps> = ({
             <div className="space-y-2.5 text-xs">
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-text-secondary">💵 Nakit Tahsilat:</span>
-                <span className="font-bold text-text-primary">{totalNakit.toLocaleString("tr-TR")} ₺</span>
+                <span className="font-bold text-text-primary">{formatTRY(totalNakit)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-text-secondary">💳 Kredi / Banka Kartı:</span>
-                <span className="font-bold text-text-primary">{totalKart.toLocaleString("tr-TR")} ₺</span>
+                <span className="font-bold text-text-primary">{formatTRY(totalKart)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-text-secondary">🏦 Havale / EFT:</span>
-                <span className="font-bold text-text-primary">{totalHavale.toLocaleString("tr-TR")} ₺</span>
+                <span className="font-bold text-text-primary">{formatTRY(totalHavale)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border/40">
                 <span className="text-text-secondary">📝 Açık Veresiye:</span>
-                <span className="font-bold text-amber-800">{totalVeresiye.toLocaleString("tr-TR")} ₺</span>
+                <span className="font-bold text-amber-800">{formatTRY(totalVeresiye)}</span>
               </div>
 
               <div className="flex justify-between pt-2 border-t border-border font-serif text-sm font-bold">
                 <span>Toplam Günlük Ciro:</span>
-                <span className="text-accent-gold">{grandTotal.toLocaleString("tr-TR")} ₺</span>
+                <span className="text-accent-gold">{formatTRY(grandTotal)}</span>
               </div>
             </div>
 

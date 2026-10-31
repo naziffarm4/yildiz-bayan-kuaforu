@@ -14,6 +14,7 @@ import {
 } from "@/lib/rate-limit";
 import {
   checkIstanbulBusinessHours,
+  extractPhoneDigits,
   generateSafeUUID,
   type FlexibleSpecialDay,
 } from "@yildiz/types";
@@ -50,10 +51,10 @@ const NormalizedAppointmentSchema = z
       .trim()
       .min(1, "Müşteri telefon numarası zorunludur.")
       .regex(/^[0-9+\s()-]+$/, "Geçersiz telefon numarası formatı.")
-      .refine(
-        (val) => val.replace(/\D/g, "").length >= 10 && val.replace(/\D/g, "").length <= 15,
-        "Geçerli bir telefon numarası giriniz."
-      ),
+      .refine((val) => {
+        const len = extractPhoneDigits(val).length;
+        return len >= 10 && len <= 15;
+      }, "Geçerli bir telefon numarası giriniz."),
     hizmetIdleri: z
       .array(z.string().trim().min(1))
       .min(1, "En az bir hizmet seçilmelidir.")
@@ -180,7 +181,7 @@ export async function POST(request: Request) {
     }
 
     const formattedPhone = normalizePhoneNumber(musteriTelefon);
-    const cleanDigits = musteriTelefon.replace(/\D/g, "");
+    const cleanDigits = extractPhoneDigits(musteriTelefon);
     const targetPhone = formattedPhone || cleanDigits;
 
     const supabaseAdmin = getSupabaseAdmin();

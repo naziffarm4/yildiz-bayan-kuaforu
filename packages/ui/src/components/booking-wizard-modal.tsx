@@ -7,6 +7,7 @@ import type {
 } from "@yildiz/types";
 import {
   calculateAppointmentTotalDuration,
+  extractPhoneDigits,
   generateSafeUUID,
   toIstanbulIso,
 } from "@yildiz/types";
@@ -177,7 +178,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   };
 
   const handleSendSms = () => {
-    if (!customerPhone || customerPhone.replace(/\D/g, "").length < 10) {
+    if (!customerPhone || extractPhoneDigits(customerPhone).length < 10) {
       setFormError("Lütfen geçerli bir telefon numarası giriniz.");
       return;
     }

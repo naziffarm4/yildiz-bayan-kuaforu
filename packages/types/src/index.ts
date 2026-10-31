@@ -740,10 +740,28 @@ export function formatTRY(amount: number): string {
 }
 
 /**
+ * Telefon metninden yalnızca rakamları ayıklar.
+ */
+export function extractPhoneDigits(raw: string): string {
+  return raw.replace(/\D/g, "");
+}
+
+/**
+ * Türkiye mobil telefon numarasının geçerli olup olmadığını kontrol eder.
+ */
+export function isValidTrPhone(raw: string): boolean {
+  const digits = extractPhoneDigits(raw);
+  if (digits.length === 10 && digits.startsWith("5")) return true;
+  if (digits.length === 11 && digits.startsWith("05")) return true;
+  if (digits.length === 12 && digits.startsWith("905")) return true;
+  return false;
+}
+
+/**
  * Telefon numarasını Türkiye E.164 standardına (+905XXXXXXXXX) dönüştürür.
  */
 export function normalizeTrPhone(raw: string): string {
-  const cleanPhone = raw.replace(/\D/g, "");
+  const cleanPhone = extractPhoneDigits(raw);
   if (!cleanPhone) return "";
   return cleanPhone.startsWith("90")
     ? `+${cleanPhone}`

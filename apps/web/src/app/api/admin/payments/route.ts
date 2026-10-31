@@ -22,27 +22,16 @@ const PAYMENT_SELECT_COLUMNS =
 const AdminPaymentCreateSchema = z.object({
   id: z.string().trim().min(1).optional(),
   randevu_id: z.string().trim().min(1).nullable().optional(),
-  randevuId: z.string().trim().min(1).nullable().optional(),
   musteri_id: z.string().trim().min(1).nullable().optional(),
-  musteriId: z.string().trim().min(1).nullable().optional(),
   islemi_yapan_calisan_id: z.string().trim().min(1).optional(),
-  islemiYapanCalisanId: z.string().trim().min(1).optional(),
   hizmet_idleri: z.array(z.string().trim().min(1)).optional(),
-  hizmetIdleri: z.array(z.string().trim().min(1)).optional(),
   hizmet_adlari: z.array(z.string().trim().min(1)).optional(),
-  hizmetAdlari: z.array(z.string().trim().min(1)).optional(),
   indirim_tipi: z.enum(["TL", "PERCENT"]).default("TL"),
-  indirimTipi: z.enum(["TL", "PERCENT"]).optional(),
   indirim_degeri: z.coerce.number().min(0).default(0),
-  indirimDegeri: z.coerce.number().min(0).optional(),
   kullanilan_puan_adedi: z.coerce.number().int().min(0).default(0),
-  kullanilanPuanAdedi: z.coerce.number().int().min(0).optional(),
   bahsis_tutari: z.coerce.number().min(0).default(0),
-  bahsisTutari: z.coerce.number().min(0).optional(),
   odeme_yontemi: PaymentMethodSchema.optional(),
-  odemeYontemi: PaymentMethodSchema.optional(),
   gizli_not: z.string().max(500).nullable().optional(),
-  gizliNot: z.string().max(500).nullable().optional(),
 });
 
 const AdminPaymentPatchSchema = z.object({
@@ -52,7 +41,6 @@ const AdminPaymentPatchSchema = z.object({
     .min(1, "Ödeme ID'si gereklidir."),
   action: z.enum(["settle_veresiye", "refund"]),
   odeme_yontemi: PaymentMethodSchema.optional(),
-  odemeYontemi: PaymentMethodSchema.optional(),
   sebep: z.string().max(500).nullable().optional(),
 });
 
@@ -116,8 +104,8 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     const body = parsed.data;
-    const serviceIds = body.hizmet_idleri ?? body.hizmetIdleri ?? [];
-    const fallbackServiceNames = body.hizmet_adlari ?? body.hizmetAdlari ?? [];
+    const serviceIds = body.hizmet_idleri ?? [];
+    const fallbackServiceNames = body.hizmet_adlari ?? [];
 
     if (serviceIds.length === 0 && fallbackServiceNames.length === 0) {
       return NextResponse.json(
@@ -127,8 +115,7 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     const authCtx = getRequestAuthContext(request);
-    const requestedStaffId =
-      body.islemi_yapan_calisan_id ?? body.islemiYapanCalisanId ?? null;
+    const requestedStaffId = body.islemi_yapan_calisan_id ?? null;
 
     // Bölüm 2.1 & N-d: Calisan kendi userId'sini kullanır; Admin başka bir personel seçtiyse varlığı ve rolü doğrulanır
     let staffId: string | null = null;
@@ -166,8 +153,8 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
       );
     }
 
-    const appointmentId = body.randevu_id ?? body.randevuId ?? null;
-    let customerId: string | null = body.musteri_id ?? body.musteriId ?? null;
+    const appointmentId = body.randevu_id ?? null;
+    let customerId: string | null = body.musteri_id ?? null;
 
     // Randevu bağlıysa durumunu ve müşteri kimliğini doğrula
     if (appointmentId) {
@@ -201,13 +188,13 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     const paymentId = body.id || generateSafeUUID();
-    const discountType = body.indirimTipi ?? body.indirim_tipi ?? "TL";
-    const discountValue = body.indirimDegeri ?? body.indirim_degeri ?? 0;
-    const usedPointsCount = body.kullanilanPuanAdedi ?? body.kullanilan_puan_adedi ?? 0;
-    const tipAmount = body.bahsisTutari ?? body.bahsis_tutari ?? 0;
-    const paymentMethod = body.odeme_yontemi ?? body.odemeYontemi ?? "Nakit";
+    const discountType = body.indirim_tipi ?? "TL";
+    const discountValue = body.indirim_degeri ?? 0;
+    const usedPointsCount = body.kullanilan_puan_adedi ?? 0;
+    const tipAmount = body.bahsis_tutari ?? 0;
+    const paymentMethod = body.odeme_yontemi ?? "Nakit";
     const isVeresiye = paymentMethod === "Veresiye";
-    const privateNote = body.gizli_not ?? body.gizliNot ?? null;
+    const privateNote = body.gizli_not ?? null;
 
     // 1. Hizmet fiyatlarını sunucuda veritabanından oku
     let resolvedServiceNames: string[] = [...fallbackServiceNames];
@@ -392,7 +379,7 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
       return parsed.response;
     }
 
-    const { id, action, odeme_yontemi, odemeYontemi, sebep } = parsed.data;
+    const { id, action, odeme_yontemi, sebep } = parsed.data;
     const authCtx = getRequestAuthContext(request);
 
     // N-e & Şartname Madde 18: İade işlemi yalnızca doğrulanmış Admin yetkisiyle yapılabilir (fail-closed)
@@ -403,7 +390,7 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
       );
     }
 
-    const resolvedMethod = odeme_yontemi ?? odemeYontemi ?? "Nakit";
+    const resolvedMethod = odeme_yontemi ?? "Nakit";
     let computedEarnedPoints: number | null = null;
 
     if (action === "settle_veresiye") {

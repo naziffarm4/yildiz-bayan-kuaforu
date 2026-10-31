@@ -21,23 +21,15 @@ import {
 const AdminAppointmentCreateSchema = z.object({
   id: z.string().trim().min(1).optional(),
   musteri_id: z.string().trim().min(1).nullable().optional(),
-  musteriId: z.string().trim().min(1).nullable().optional(),
   musteri_ad_soyad: z.string().trim().min(1).max(80).optional(),
-  musteriAdSoyad: z.string().trim().min(1).max(80).optional(),
   musteri_telefon: z.string().trim().min(1).max(30).optional(),
-  musteriTelefon: z.string().trim().min(1).max(30).optional(),
   hizmet_idleri: z.array(z.string().trim().min(1)).optional(),
-  hizmetIdleri: z.array(z.string().trim().min(1)).optional(),
   calisan_idleri: z.array(z.string().trim().min(1)).optional(),
-  calisanIdleri: z.array(z.string().trim().min(1)).optional(),
   tarih_saat: z.string().trim().min(1).optional(),
-  tarihSaat: z.string().trim().min(1).optional(),
   toplam_sure_dakika: z.coerce.number().int().positive().max(720).optional(),
-  toplamSureDakika: z.coerce.number().int().positive().max(720).optional(),
   durum: AppointmentStatusSchema.optional(),
   kaynak: AppointmentSourceSchema.optional(),
   notlar: z.string().max(500).nullable().optional(),
-  not: z.string().max(500).nullable().optional(),
 });
 
 const AdminAppointmentPatchSchema = z.object({
@@ -47,9 +39,7 @@ const AdminAppointmentPatchSchema = z.object({
     .min(1, "ID parametresi gereklidir."),
   durum: AppointmentStatusSchema.optional(),
   calisan_idleri: z.array(z.string().trim().min(1)).optional(),
-  calisanIdleri: z.array(z.string().trim().min(1)).optional(),
   toplam_sure_dakika: z.coerce.number().int().positive().max(720).optional(),
-  toplamSureDakika: z.coerce.number().int().positive().max(720).optional(),
   notlar: z.string().max(500).nullable().optional(),
 });
 
@@ -120,16 +110,16 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     const body = parsed.data;
-    const musteriAdSoyad = (body.musteri_ad_soyad ?? body.musteriAdSoyad ?? "").trim();
-    const musteriTelefon = (body.musteri_telefon ?? body.musteriTelefon ?? "").trim();
-    const hizmetIdleri = body.hizmet_idleri ?? body.hizmetIdleri ?? [];
-    const calisanIdleri = body.calisan_idleri ?? body.calisanIdleri ?? [];
-    const rawTarihSaat = (body.tarih_saat ?? body.tarihSaat ?? "").trim();
-    const toplamSureDakika = body.toplam_sure_dakika ?? body.toplamSureDakika ?? 30;
+    const musteriAdSoyad = (body.musteri_ad_soyad ?? "").trim();
+    const musteriTelefon = (body.musteri_telefon ?? "").trim();
+    const hizmetIdleri = body.hizmet_idleri ?? [];
+    const calisanIdleri = body.calisan_idleri ?? [];
+    const rawTarihSaat = (body.tarih_saat ?? "").trim();
+    const toplamSureDakika = body.toplam_sure_dakika ?? 30;
     const durum: AppointmentStatus = body.durum ?? "Onaylandı";
     const kaynak: AppointmentSource = body.kaynak ?? "Telefon";
-    const notlar = body.notlar ?? body.not ?? null;
-    const musteriId = body.musteri_id ?? body.musteriId ?? null;
+    const notlar = body.notlar ?? null;
+    const musteriId = body.musteri_id ?? null;
 
     if (!musteriAdSoyad || !musteriTelefon || hizmetIdleri.length === 0 || !rawTarihSaat) {
       return NextResponse.json(
@@ -210,9 +200,7 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
       id,
       durum,
       calisan_idleri,
-      calisanIdleri,
       toplam_sure_dakika,
-      toplamSureDakika,
       notlar,
     } = parsed.data;
 
@@ -236,14 +224,12 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
       }
     }
 
-    const resolvedStaffIds = calisan_idleri ?? calisanIdleri;
-    if (resolvedStaffIds !== undefined) {
-      updates.calisan_idleri = resolvedStaffIds;
+    if (calisan_idleri !== undefined) {
+      updates.calisan_idleri = calisan_idleri;
     }
 
-    const resolvedDuration = toplam_sure_dakika ?? toplamSureDakika;
-    if (resolvedDuration !== undefined) {
-      updates.toplam_sure_dakika = resolvedDuration;
+    if (toplam_sure_dakika !== undefined) {
+      updates.toplam_sure_dakika = toplam_sure_dakika;
     }
 
     if (notlar !== undefined) {

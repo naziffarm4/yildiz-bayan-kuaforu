@@ -6,6 +6,7 @@ import type {
   ServiceItem,
   StaffProfile,
 } from "@yildiz/types";
+import { formatTRY } from "@yildiz/types";
 import { Card } from "./card";
 import { Button } from "./button";
 import { Badge } from "./badge";
@@ -86,7 +87,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
           <div className="mt-3">
             <span className="font-serif text-2xl font-bold text-text-primary">
-              {totalDailyRevenue.toLocaleString("tr-TR")} ₺
+              {formatTRY(totalDailyRevenue)}
             </span>
             <span className="text-[11px] text-emerald-700 block mt-1 font-medium">
               ✓ {payments.length} adet tahsilat işlemi

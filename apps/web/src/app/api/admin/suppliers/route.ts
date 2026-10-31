@@ -8,23 +8,15 @@ import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
 import { recordAuditLog } from "@/lib/audit-log";
 import type { Database } from "@yildiz/types";
 
-const AdminSupplierPostSchema = z
-  .object({
-    firma_adi: z.string().trim().min(1).max(150).optional(),
-    firmaAdi: z.string().trim().min(1).max(150).optional(),
-    yetkili_kisi: z.string().trim().min(1).max(150).optional(),
-    yetkiliKisi: z.string().trim().min(1).max(150).optional(),
-    telefon: z.string({ required_error: "Telefon zorunludur." }).trim().min(1).max(30),
-    whatsapp: z.string().trim().max(30).nullable().optional(),
-    eposta: z.string().trim().max(150).nullable().optional(),
-    kategoriler: z.array(z.string().trim().min(1)).optional().default([]),
-    adres: z.string().trim().max(500).nullable().optional(),
-  })
-  .refine(
-    (data) =>
-      Boolean((data.firma_adi || data.firmaAdi) && (data.yetkili_kisi || data.yetkiliKisi)),
-    { message: "Firma adı ve yetkili kişi alanları zorunludur." }
-  );
+const AdminSupplierPostSchema = z.object({
+  firma_adi: z.string({ required_error: "Firma adı ve yetkili kişi alanları zorunludur." }).trim().min(1).max(150),
+  yetkili_kisi: z.string({ required_error: "Firma adı ve yetkili kişi alanları zorunludur." }).trim().min(1).max(150),
+  telefon: z.string({ required_error: "Telefon zorunludur." }).trim().min(1).max(30),
+  whatsapp: z.string().trim().max(30).nullable().optional(),
+  eposta: z.string().trim().max(150).nullable().optional(),
+  kategoriler: z.array(z.string().trim().min(1)).optional().default([]),
+  adres: z.string().trim().max(500).nullable().optional(),
+});
 
 const AdminSupplierPatchSchema = z.object({
   id: z
@@ -32,9 +24,7 @@ const AdminSupplierPatchSchema = z.object({
     .trim()
     .min(1, "ID parametresi gereklidir."),
   firma_adi: z.string().trim().min(1).max(150).optional(),
-  firmaAdi: z.string().trim().min(1).max(150).optional(),
   yetkili_kisi: z.string().trim().min(1).max(150).optional(),
-  yetkiliKisi: z.string().trim().min(1).max(150).optional(),
   telefon: z.string().trim().min(1).max(30).optional(),
   whatsapp: z.string().trim().max(30).nullable().optional(),
   eposta: z.string().trim().max(150).nullable().optional(),
@@ -100,8 +90,8 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     const { data, error } = await supabase
       .from("suppliers")
       .insert({
-        firma_adi: (body.firma_adi ?? body.firmaAdi)!,
-        yetkili_kisi: (body.yetkili_kisi ?? body.yetkiliKisi)!,
+        firma_adi: body.firma_adi,
+        yetkili_kisi: body.yetkili_kisi,
         telefon: body.telefon,
         whatsapp: body.whatsapp ?? null,
         eposta: body.eposta ?? null,
@@ -121,8 +111,8 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
       entityType: "suppliers",
       entityId: data?.id ?? null,
       metadata: {
-        firma_adi: body.firma_adi ?? body.firmaAdi,
-        yetkili_kisi: body.yetkili_kisi ?? body.yetkiliKisi,
+        firma_adi: body.firma_adi,
+        yetkili_kisi: body.yetkili_kisi,
       },
     });
 
@@ -183,15 +173,11 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     const body = parsed.data;
-    const { id, firmaAdi, yetkiliKisi } = body;
+    const { id } = body;
 
     const updates: Database["public"]["Tables"]["suppliers"]["Update"] = {};
-    if (firmaAdi !== undefined || body.firma_adi !== undefined) {
-      updates.firma_adi = firmaAdi ?? body.firma_adi;
-    }
-    if (yetkiliKisi !== undefined || body.yetkili_kisi !== undefined) {
-      updates.yetkili_kisi = yetkiliKisi ?? body.yetkili_kisi;
-    }
+    if (body.firma_adi !== undefined) updates.firma_adi = body.firma_adi;
+    if (body.yetkili_kisi !== undefined) updates.yetkili_kisi = body.yetkili_kisi;
     if (body.telefon !== undefined) updates.telefon = body.telefon;
     if (body.whatsapp !== undefined) updates.whatsapp = body.whatsapp;
     if (body.eposta !== undefined) updates.eposta = body.eposta;

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import type { ServiceItem } from "@yildiz/types";
-import { generateSafeUUID } from "@yildiz/types";
+import { formatTRY, generateSafeUUID } from "@yildiz/types";
 import { Button } from "./button";
 import { Badge } from "./badge";
 
@@ -217,7 +217,7 @@ export const ServiceManager: React.FC<ServiceManagerProps> = ({
                 <div className="text-right">
                   <span className="text-text-secondary block text-[11px] font-medium">Ücret:</span>
                   <span className="font-serif font-bold text-base text-accent-gold">
-                    {service.fiyat.toLocaleString("tr-TR")} ₺
+                    {formatTRY(service.fiyat)}
                   </span>
                 </div>
               </div>
@@ -297,7 +297,7 @@ export const ServiceManager: React.FC<ServiceManagerProps> = ({
                     {service.tahminiSureDakika} dk
                   </td>
                   <td className="py-3.5 px-4 font-bold text-text-primary">
-                    {service.fiyat.toLocaleString("tr-TR")} ₺
+                    {formatTRY(service.fiyat)}
                   </td>
                   <td className="py-3.5 px-4">
                     {service.aktif ? (

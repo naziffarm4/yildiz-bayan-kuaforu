@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import type { AppointmentItem, ServiceItem } from "@yildiz/types";
+import { extractPhoneDigits, type AppointmentItem, type ServiceItem } from "@yildiz/types";
 import { Card, Button, Badge } from "@yildiz/ui";
 import { useContent } from "../lib/content-context";
 
@@ -22,16 +22,16 @@ export const AppointmentTracker: React.FC<AppointmentTrackerProps> = ({
   const [hasSearched, setHasSearched] = useState(false);
   const [foundAppointment, setFoundAppointment] = useState<AppointmentItem | null>(null);
 
-  const cleanPhone = (p: string) => p.replace(/\D/g, "");
-
   const handleSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const query = cleanPhone(phoneNumber);
+    const query = extractPhoneDigits(phoneNumber);
     if (!query) return;
 
     // Telefonun son 10 hanesini eşleştir
     const target = query.slice(-10);
-    const matched = appointments.find((a) => cleanPhone(a.musteriTelefon).endsWith(target));
+    const matched = appointments.find((a) =>
+      extractPhoneDigits(a.musteriTelefon).endsWith(target)
+    );
 
     setFoundAppointment(matched ?? null);
     setHasSearched(true);

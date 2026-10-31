@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import type { StaffProfile, CashPayment } from "@yildiz/types";
-import { calculateCommission, generateSafeUUID } from "@yildiz/types";
+import { calculateCommission, formatTRY, generateSafeUUID } from "@yildiz/types";
 import { Card } from "./card";
 import { Badge } from "./badge";
 import { Button } from "./button";
@@ -151,11 +151,11 @@ export const StaffCommissionManager: React.FC<StaffCommissionManagerProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Hizmet Cirosu:</span>
-                  <span className="font-medium text-text-primary">{memberTotalRevenue.toLocaleString("tr-TR")} ₺</span>
+                  <span className="font-medium text-text-primary">{formatTRY(memberTotalRevenue)}</span>
                 </div>
                 <div className="flex justify-between pt-1.5 border-t border-border/60 font-serif text-sm font-bold">
                   <span>Net Hakediş:</span>
-                  <span className="text-accent-gold">{netCommission.toLocaleString("tr-TR")} ₺</span>
+                  <span className="text-accent-gold">{formatTRY(netCommission)}</span>
                 </div>
               </div>
 

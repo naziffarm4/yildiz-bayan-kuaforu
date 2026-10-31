@@ -465,7 +465,17 @@ export default function AdminPage() {
     setCurrentTab("pos");
   };
 
-  const handlePaymentCompleted = (payment: CashPayment, appointmentId?: string) => {
+  const handlePaymentCompleted = async (
+    payment: CashPayment,
+    appointmentId?: string,
+    meta?: {
+      serviceIds?: string[];
+      discountType?: "TL" | "PERCENT";
+      discountValue?: number;
+      usedPointsCount?: number;
+    },
+  ) => {
+    const previousAppointments = appointments;
     setPayments((prev) => [payment, ...prev]);
     if (appointmentId) {
       setAppointments((prev) =>
@@ -474,42 +484,65 @@ export default function AdminPage() {
     }
 
     try {
-      const client = createClient();
-      const paymentService = new PaymentService(client);
-      const appointmentService = new AppointmentService(client);
+      const res = await fetch("/api/admin/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: payment.id,
+          randevu_id: appointmentId ?? payment.randevuId ?? null,
+          musteri_id: payment.musteriId,
+          islemi_yapan_calisan_id: payment.islemiYapanCalisanId,
+          hizmet_idleri: meta?.serviceIds ?? [],
+          hizmet_adlari: payment.hizmetAdlari,
+          indirim_tipi: meta?.discountType ?? "TL",
+          indirim_degeri: meta?.discountValue ?? payment.indirimTutari,
+          kullanilan_puan_adedi:
+            meta?.usedPointsCount ?? Math.round(payment.kullanilanPuanTutari * 2),
+          bahsis_tutari: payment.bahsisTutari,
+          odeme_yontemi: payment.odemeYontemi,
+          gizli_not: payment.gizliNot ?? null,
+        }),
+      });
 
-      paymentService
-        .recordPayment(
-          {
-            id: payment.id,
-            randevu_id: appointmentId ?? payment.randevuId ?? null,
-            musteri_id: payment.musteriId,
-            islemi_yapan_calisan_id: payment.islemiYapanCalisanId,
-            hizmet_adlari: payment.hizmetAdlari,
-            toplam_tutar: payment.toplamTutar,
-            odenen_tutar: payment.odenenTutar,
-            indirim_tutari: payment.indirimTutari,
-            kullanilan_puan: payment.kullanilanPuanTutari,
-            odeme_yontemi: payment.odemeYontemi,
-            bahsis_tutari: payment.bahsisTutari,
-            veresiye: payment.veresiye,
-            gizli_not: payment.gizliNot ?? null,
-          },
-          Math.floor(payment.odenenTutar * 0.1),
-        )
-        .catch((err: unknown) => {
-          console.warn("Ödeme veritabanına kaydedilemedi:", err);
-        });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        setPayments((prev) => prev.filter((p) => p.id !== payment.id));
+        if (appointmentId) {
+          setAppointments(previousAppointments);
+        }
+        const errMsg = json.error || "Tahsilat kaydedilemedi.";
+        toast.error(errMsg);
+        throw new Error(errMsg);
+      }
 
-      if (appointmentId) {
-        appointmentService
-          .updateAppointmentStatus(appointmentId, "Tamamlandı", activeStaffMember?.id)
-          .catch((err: unknown) => {
-            console.warn("Randevu durumu tamamlandı olarak güncellenemedi:", err);
-          });
+      if (json.data) {
+        setPayments((prev) =>
+          prev.map((p) =>
+            p.id === payment.id
+              ? {
+                  ...p,
+                  toplamTutar: Number(json.data.toplam_tutar ?? p.toplamTutar),
+                  indirimTutari: Number(json.data.indirim_tutari ?? p.indirimTutari),
+                  kullanilanPuanTutari: Number(
+                    json.data.kullanilan_puan_indirimi ?? p.kullanilanPuanTutari,
+                  ),
+                  odenenTutar: Number(json.data.odenen_tutar ?? p.odenenTutar),
+                }
+              : p,
+          ),
+        );
       }
     } catch (err: unknown) {
-      console.warn("Ödeme servisi başlatılamadı:", err);
+      setPayments((prev) => prev.filter((p) => p.id !== payment.id));
+      if (appointmentId) {
+        setAppointments(previousAppointments);
+      }
+      if (err instanceof Error) {
+        throw err;
+      }
+      const fallbackMsg = "Tahsilat sunucuya iletilemedi.";
+      toast.error(fallbackMsg);
+      throw new Error(fallbackMsg);
     }
   };
 

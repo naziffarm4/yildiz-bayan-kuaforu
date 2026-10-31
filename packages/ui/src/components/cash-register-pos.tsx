@@ -25,7 +25,16 @@ export interface CashRegisterPOSProps {
   payments: CashPayment[];
   selectedAppointmentForPOS: AppointmentItem | null;
   onClearSelectedAppointment: () => void;
-  onPaymentCompleted: (payment: CashPayment, appointmentId?: string) => void;
+  onPaymentCompleted: (
+    payment: CashPayment,
+    appointmentId?: string,
+    meta?: {
+      serviceIds?: string[];
+      discountType?: "TL" | "PERCENT";
+      discountValue?: number;
+      usedPointsCount?: number;
+    },
+  ) => Promise<void> | void;
   activeStaffName: string;
 }
 
@@ -70,6 +79,8 @@ export const CashRegisterPOS: React.FC<CashRegisterPOSProps> = ({
   } | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [smsFeedback, setSmsFeedback] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   // Randevu POS'a aktarıldıysa alanları doldur
   useEffect(() => {
@@ -155,12 +166,19 @@ export const CashRegisterPOS: React.FC<CashRegisterPOSProps> = ({
   const physicalCashCount = parseFloat(cashDifferenceInput) || totalNakit;
   const cashDifference = physicalCashCount - totalNakit;
 
-  const handleCompletePayment = (e: React.FormEvent) => {
+  const handleCompletePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim() || currentServices.length === 0) return;
+    if (!customerName.trim() || currentServices.length === 0 || isSubmittingPayment) return;
+
+    setPaymentError(null);
+    setIsSubmittingPayment(true);
 
     const paymentId = generateSafeUUID();
     const apptId = selectedAppointmentId || undefined;
+    const matchedAppointment = apptId
+      ? appointments.find((a) => a.id === apptId)
+      : undefined;
+    const resolvedCustomerId = matchedAppointment?.musteriId || generateSafeUUID();
     const servicesStr = currentServices.map((s) => s.ad).join(", ");
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const reviewUrl = `${origin}/degerlendir?ref=${encodeURIComponent(apptId || paymentId)}&name=${encodeURIComponent(customerName.trim())}&service=${encodeURIComponent(servicesStr)}`;
@@ -168,7 +186,7 @@ export const CashRegisterPOS: React.FC<CashRegisterPOSProps> = ({
     const newPayment: CashPayment = {
       id: paymentId,
       randevuId: apptId,
-      musteriId: generateSafeUUID(),
+      musteriId: resolvedCustomerId,
       musteriAdSoyad: customerName.trim(),
       islemiYapanCalisanId: staffId,
       hizmetAdlari: currentServices.map((s) => s.ad),
@@ -183,17 +201,32 @@ export const CashRegisterPOS: React.FC<CashRegisterPOSProps> = ({
       olusturulmaTarihi: new Date().toISOString(),
     };
 
-    onPaymentCompleted(newPayment, apptId);
+    try {
+      await onPaymentCompleted(newPayment, apptId, {
+        serviceIds: selectedServiceIds,
+        discountType,
+        discountValue,
+        usedPointsCount: usedPoints,
+      });
 
-    // Başarılı tahsilat ve misafir memnuniyet modalını aç
-    setSuccessReviewModal({
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      serviceNames: servicesStr,
-      paymentId,
-      appointmentId: apptId,
-      reviewUrl,
-    });
+      // Başarılı tahsilat ve misafir memnuniyet modalını aç
+      setSuccessReviewModal({
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        serviceNames: servicesStr,
+        paymentId,
+        appointmentId: apptId,
+        reviewUrl,
+      });
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Tahsilat kaydedilirken bir hata oluştu.";
+      setPaymentError(msg);
+    } finally {
+      setIsSubmittingPayment(false);
+    }
   };
 
   const handleCloseReviewModal = () => {
@@ -497,6 +530,12 @@ export const CashRegisterPOS: React.FC<CashRegisterPOSProps> = ({
                   className="w-full px-3 py-2 border border-border rounded-md text-xs bg-white text-text-primary"
                 />
               </div>
+
+              {paymentError && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                  {paymentError}
+                </div>
+              )}
 
               {/* Fiş Özeti & Tahsil Et Butonu */}
               <div className="p-4 sm:p-5 rounded-xl bg-bg-secondary border border-border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">

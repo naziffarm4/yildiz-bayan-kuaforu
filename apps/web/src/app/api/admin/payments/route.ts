@@ -16,6 +16,9 @@ import {
 import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
 import { recordAuditLog } from "@/lib/audit-log";
 
+const PAYMENT_SELECT_COLUMNS =
+  "id, randevu_id, musteri_id, islemi_yapan_calisan_id, hizmet_adlari, toplam_tutar, odenen_tutar, indirim_tutari, kullanilan_puan, odeme_yontemi, bahsis_tutari, veresiye, gizli_not, iade_tarihi, iade_eden_id, iade_tutari, olusturulma_tarihi";
+
 const AdminPaymentCreateSchema = z.object({
   id: z.string().trim().min(1).optional(),
   randevu_id: z.string().trim().min(1).nullable().optional(),
@@ -50,6 +53,7 @@ const AdminPaymentPatchSchema = z.object({
   action: z.enum(["settle_veresiye", "refund"]),
   odeme_yontemi: PaymentMethodSchema.optional(),
   odemeYontemi: PaymentMethodSchema.optional(),
+  sebep: z.string().max(500).nullable().optional(),
 });
 
 export const GET = withStaffOrAdminAuth(async (request: Request) => {
@@ -59,6 +63,7 @@ export const GET = withStaffOrAdminAuth(async (request: Request) => {
       return safeErrorResponse("Supabase bağlantısı eksik.", 500);
     }
 
+    const authCtx = getRequestAuthContext(request);
     const url = new URL(request.url || "http://localhost/api/admin/payments");
     const rawLimit = Number(url.searchParams.get("limit") ?? 200);
     const rawOffset = Number(url.searchParams.get("offset") ?? 0);
@@ -71,7 +76,7 @@ export const GET = withStaffOrAdminAuth(async (request: Request) => {
 
     let query = supabase
       .from("payments")
-      .select("*")
+      .select(PAYMENT_SELECT_COLUMNS)
       .order("olusturulma_tarihi", { ascending: false });
 
     const dynamicQuery = query as unknown as {
@@ -86,7 +91,12 @@ export const GET = withStaffOrAdminAuth(async (request: Request) => {
       return safeErrorResponse("Ödemeler getirilemedi.", 500, error);
     }
 
-    const rows = data ?? [];
+    const rawRows = (data ?? []) as Array<Record<string, unknown>>;
+    const rows =
+      authCtx?.role === "Calisan"
+        ? rawRows.map((row) => ({ ...row, gizli_not: null }))
+        : rawRows;
+
     return NextResponse.json({
       success: true,
       data: rows,
@@ -128,12 +138,31 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     const requestedStaffId =
       body.islemi_yapan_calisan_id ?? body.islemiYapanCalisanId ?? null;
 
-    // Bölüm 2.1: Calisan kendi dışındaki bir çalışan ID'sini gönderse bile kendi userId'si atanır (komisyon sahteciliği önlemi)
+    // Bölüm 2.1 & N-d: Calisan kendi userId'sini kullanır; Admin başka bir personel seçtiyse varlığı ve rolü doğrulanır
     let staffId: string | null = null;
     if (authCtx?.role === "Calisan") {
       staffId = authCtx.userId;
     } else if (authCtx?.role === "Admin") {
-      staffId = requestedStaffId || authCtx.userId;
+      if (requestedStaffId && requestedStaffId !== authCtx.userId) {
+        const { data: staffProfile } = await supabase
+          .from("profiles")
+          .select("id, rol")
+          .eq("id", requestedStaffId)
+          .maybeSingle();
+
+        if (
+          !staffProfile ||
+          (staffProfile.rol !== "Admin" && staffProfile.rol !== "Calisan")
+        ) {
+          return NextResponse.json(
+            { error: "Geçersiz personel kimliği." },
+            { status: 400 }
+          );
+        }
+        staffId = staffProfile.id;
+      } else {
+        staffId = authCtx.userId;
+      }
     } else {
       staffId = requestedStaffId || authCtx?.userId || null;
     }
@@ -392,11 +421,11 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
       return parsed.response;
     }
 
-    const { id, action, odeme_yontemi, odemeYontemi } = parsed.data;
+    const { id, action, odeme_yontemi, odemeYontemi, sebep } = parsed.data;
     const authCtx = getRequestAuthContext(request);
 
-    // Şartname Madde 18: İade işlemi yalnızca Admin tarafından yapılabilir
-    if (action === "refund" && authCtx?.role === "Calisan") {
+    // N-e & Şartname Madde 18: İade işlemi yalnızca doğrulanmış Admin yetkisiyle yapılabilir (fail-closed)
+    if (action === "refund" && authCtx?.role !== "Admin") {
       return NextResponse.json(
         { error: "İade işlemi yalnızca Admin yetkisiyle yapılabilir." },
         { status: 403 }
@@ -404,13 +433,33 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
     }
 
     const resolvedMethod = odeme_yontemi ?? odemeYontemi ?? "Nakit";
+    let computedEarnedPoints: number | null = null;
+
+    if (action === "settle_veresiye") {
+      try {
+        const paymentRowResult = await supabase
+          .from("payments")
+          .select("odenen_tutar")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (paymentRowResult?.data && "odenen_tutar" in paymentRowResult.data) {
+          computedEarnedPoints = calculateLoyaltyPoints(
+            Number(paymentRowResult.data.odenen_tutar ?? 0)
+          );
+        }
+      } catch (lookupErr: unknown) {
+        console.warn("Veresiye tutar ön okuması uyarısı:", lookupErr);
+      }
+    }
+
     const rpcClient = supabase as unknown as {
       rpc: (
         fn: string,
         args: Record<string, unknown>
       ) => Promise<{
         data: unknown;
-        error: { message?: string } | null;
+        error: { message?: string; code?: string } | null;
       }>;
     };
 
@@ -418,11 +467,21 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
       p_payment_id: id,
       p_action: action,
       p_odeme_yontemi: resolvedMethod,
+      p_actor_id: authCtx?.userId ?? null,
+      p_earned_points: computedEarnedPoints,
+      p_sebep: sebep ?? null,
     });
 
     if (error) {
+      const errMsg = error.message ?? "";
+      if (error.code === "23505" || /zaten iade edilmiş/i.test(errMsg)) {
+        return NextResponse.json(
+          { error: "Bu ödeme zaten iade edilmiş." },
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
-        { error: error.message || "Ödeme güncellenemedi." },
+        { error: errMsg || "Ödeme güncellenemedi." },
         { status: 400 }
       );
     }
@@ -435,7 +494,7 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
       action: action === "refund" ? "payment.refund" : "payment.settle_veresiye",
       entityType: "payments",
       entityId: id,
-      metadata: { action, odeme_yontemi: resolvedMethod },
+      metadata: { action, odeme_yontemi: resolvedMethod, sebep: sebep ?? null },
     });
 
     return NextResponse.json({ success: true, data });

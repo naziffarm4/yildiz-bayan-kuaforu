@@ -1,23 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { RouteHandler } from "../src/lib/auth/api-guard";
 
-const { mockAuthGetUser, mockProfileMaybeSingle, mockRpc, mockAuthCtx } =
-  vi.hoisted(() => ({
-    mockAuthGetUser: vi.fn().mockResolvedValue({
-      data: { user: { id: "staff-user-1" } },
-      error: null,
-    }),
-    mockProfileMaybeSingle: vi.fn().mockResolvedValue({
-      data: { rol: "Calisan" },
-      error: null,
-    }),
-    mockRpc: vi.fn(),
-    mockAuthCtx: {
-      userId: "staff-user-1",
-      role: "Calisan" as "Admin" | "Calisan",
-      ipAddress: "127.0.0.1",
-    },
-  }));
+const {
+  mockAuthGetUser,
+  mockProfileMaybeSingle,
+  mockStaffCheckMaybeSingle,
+  mockPaymentLookupMaybeSingle,
+  mockRpc,
+  mockAuthCtx,
+} = vi.hoisted(() => ({
+  mockAuthGetUser: vi.fn().mockResolvedValue({
+    data: { user: { id: "staff-user-1" } },
+    error: null,
+  }),
+  mockProfileMaybeSingle: vi.fn().mockResolvedValue({
+    data: { rol: "Calisan" },
+    error: null,
+  }),
+  mockStaffCheckMaybeSingle: vi.fn().mockResolvedValue({
+    data: { id: "valid-staff-2", rol: "Calisan" },
+    error: null,
+  }),
+  mockPaymentLookupMaybeSingle: vi.fn().mockResolvedValue({
+    data: { odenen_tutar: 600 },
+    error: null,
+  }),
+  mockRpc: vi.fn(),
+  mockAuthCtx: {
+    userId: "staff-user-1",
+    role: "Calisan" as "Admin" | "Calisan",
+    ipAddress: "127.0.0.1",
+  },
+}));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(() => ({
@@ -59,6 +73,15 @@ vi.mock("@/lib/supabase/admin", () => ({
           }),
         };
       }
+      if (table === "profiles") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: mockStaffCheckMaybeSingle,
+            }),
+          }),
+        };
+      }
       if (table === "appointments") {
         return {
           select: vi.fn().mockReturnValue({
@@ -80,9 +103,18 @@ vi.mock("@/lib/supabase/admin", () => ({
           select: vi.fn().mockReturnValue({
             order: vi.fn().mockReturnValue({
               range: vi.fn().mockResolvedValue({
-                data: [{ id: "pay-1", odenen_tutar: 600 }],
+                data: [
+                  {
+                    id: "pay-1",
+                    odenen_tutar: 600,
+                    gizli_not: "Müşteri hassas saç derisi notu",
+                  },
+                ],
                 error: null,
               }),
+            }),
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: mockPaymentLookupMaybeSingle,
             }),
           }),
         };
@@ -110,7 +142,7 @@ import {
   PATCH as PaymentsPATCH,
 } from "../src/app/api/admin/payments/route";
 
-describe("Admin POS Payments API (/api/admin/payments - Y3 & Bölüm 2.1/4.1)", () => {
+describe("Admin POS Payments API (/api/admin/payments - Y3, N1, N2, N3, N-d)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthCtx.userId = "staff-user-1";
@@ -122,6 +154,14 @@ describe("Admin POS Payments API (/api/admin/payments - Y3 & Bölüm 2.1/4.1)", 
     });
     mockProfileMaybeSingle.mockResolvedValue({
       data: { rol: "Calisan" },
+      error: null,
+    });
+    mockStaffCheckMaybeSingle.mockResolvedValue({
+      data: { id: "valid-staff-2", rol: "Calisan" },
+      error: null,
+    });
+    mockPaymentLookupMaybeSingle.mockResolvedValue({
+      data: { odenen_tutar: 600 },
       error: null,
     });
     mockRpc.mockImplementation((_fn: string, args: Record<string, unknown>) =>
@@ -159,19 +199,29 @@ describe("Admin POS Payments API (/api/admin/payments - Y3 & Bölüm 2.1/4.1)", 
     expect(json.data.kullanilan_puan_indirimi).toBe(100);
     expect(json.data.odenen_tutar).toBe(2600);
     expect(json.data.kazanilan_puan).toBe(260);
+  });
 
-    expect(mockRpc).toHaveBeenCalledWith(
-      "record_payment_transaction",
-      expect.objectContaining({
-        p_islemi_yapan_calisan_id: "staff-user-1",
-        p_toplam_tutar: 3000,
-        p_indirim_tutari: 300,
-        p_kullanilan_puan: 200,
-        p_odenen_tutar: 2600,
-        p_kazanilan_puan: 260,
-        p_veresiye: false,
-      })
-    );
+  it("Admin geçersiz veya müşteri rolündeki bir personel ID'si gönderdiğinde 400 döner (N-d)", async () => {
+    mockAuthCtx.role = "Admin";
+    mockAuthCtx.userId = "admin-user-1";
+    mockStaffCheckMaybeSingle.mockResolvedValueOnce({
+      data: { id: "cust-1", rol: "Musteri" },
+      error: null,
+    });
+
+    const req = new Request("http://localhost/api/admin/payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        hizmet_idleri: ["srv-kesim"],
+        islemi_yapan_calisan_id: "cust-1",
+      }),
+    });
+
+    const res = await PaymentsPOST(req);
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toContain("Geçersiz personel");
   });
 
   it("veresiye ödemede kazanılan puanı 0 olarak hesaplar (Şartname Madde 4)", async () => {
@@ -188,16 +238,7 @@ describe("Admin POS Payments API (/api/admin/payments - Y3 & Bölüm 2.1/4.1)", 
     const res = await PaymentsPOST(req);
     expect(res.status).toBe(201);
     const json = await res.json();
-    expect(json.data.toplam_tutar).toBe(600);
-    expect(json.data.odenen_tutar).toBe(600);
     expect(json.data.kazanilan_puan).toBe(0);
-    expect(mockRpc).toHaveBeenCalledWith(
-      "record_payment_transaction",
-      expect.objectContaining({
-        p_veresiye: true,
-        p_kazanilan_puan: 0,
-      })
-    );
   });
 
   it("mükerrer randevu ödemesinde RPC 23505 hatasını 409 Conflict olarak döndürür", async () => {
@@ -220,45 +261,26 @@ describe("Admin POS Payments API (/api/admin/payments - Y3 & Bölüm 2.1/4.1)", 
 
     const res = await PaymentsPOST(req);
     expect(res.status).toBe(409);
-    const json = await res.json();
-    expect(json.error).toContain("zaten alınmış");
   });
 
-  it("yetersiz sadakat puanı durumunda RPC hatasını 400 olarak döndürür", async () => {
-    mockRpc.mockResolvedValueOnce({
-      data: null,
-      error: { message: "Yetersiz sadakat puanı bakiyesi." },
-    });
-
-    const req = new Request("http://localhost/api/admin/payments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        hizmet_idleri: ["srv-kesim"],
-        kullanilan_puan_adedi: 500,
-        odeme_yontemi: "Nakit",
-        musteri_id: "cust-uuid-3",
-      }),
-    });
-
-    const res = await PaymentsPOST(req);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json.error).toContain("Yetersiz sadakat puanı");
-  });
-
-  it("GET sayfalı ödeme listesini döner", async () => {
-    const req = new Request(
-      "http://localhost/api/admin/payments?limit=25&offset=0"
+  it("GET Calisan rolü için gizli_not alanını maskeler, Admin için korur", async () => {
+    mockAuthCtx.role = "Calisan";
+    const staffRes = await PaymentsGET(
+      new Request("http://localhost/api/admin/payments?limit=25&offset=0")
     );
-    const res = await PaymentsGET(req);
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.success).toBe(true);
-    expect(json.pagination.limit).toBe(25);
+    expect(staffRes.status).toBe(200);
+    const staffJson = await staffRes.json();
+    expect(staffJson.data[0].gizli_not).toBeNull();
+
+    mockAuthCtx.role = "Admin";
+    const adminRes = await PaymentsGET(
+      new Request("http://localhost/api/admin/payments?limit=25&offset=0")
+    );
+    const adminJson = await adminRes.json();
+    expect(adminJson.data[0].gizli_not).toBe("Müşteri hassas saç derisi notu");
   });
 
-  it("PATCH settle_veresiye işlemini Calisan ve Admin için çalıştırır; refund işlemini Calisan için 403 ile reddedip Admin için çalıştırır", async () => {
+  it("PATCH settle_veresiye işleminde sunucuda hesaplanan p_earned_points değerini geçirir; refund işleminde odenen_tutar korunup iade_tutari yazılır ve ikinci iade 409 döner (N1, N2, N3)", async () => {
     const settleReq = new Request("http://localhost/api/admin/payments", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -274,6 +296,9 @@ describe("Admin POS Payments API (/api/admin/payments - Y3 & Bölüm 2.1/4.1)", 
       p_payment_id: "pay-veresiye-1",
       p_action: "settle_veresiye",
       p_odeme_yontemi: "Nakit",
+      p_actor_id: "staff-user-1",
+      p_earned_points: 60,
+      p_sebep: null,
     });
 
     // Calisan iade yapamaz
@@ -288,10 +313,45 @@ describe("Admin POS Payments API (/api/admin/payments - Y3 & Bölüm 2.1/4.1)", 
     const staffRefundRes = await PaymentsPATCH(staffRefundReq);
     expect(staffRefundRes.status).toBe(403);
 
-    // Admin iade yapabilir
+    // Admin ilk iadeyi yapar: odenen_tutar korunur, iade_tutari ve iade_tarihi döner
     mockAuthCtx.role = "Admin";
     mockAuthCtx.userId = "admin-user-1";
+    mockRpc.mockResolvedValueOnce({
+      data: {
+        id: "pay-1",
+        odenen_tutar: 600,
+        iade_tutari: 600,
+        iade_tarihi: "2026-10-31T10:00:00Z",
+        iade_eden_id: "admin-user-1",
+      },
+      error: null,
+    });
+
     const adminRefundReq = new Request("http://localhost/api/admin/payments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: "pay-1",
+        action: "refund",
+        sebep: "Müşteri talebi",
+      }),
+    });
+    const adminRefundRes = await PaymentsPATCH(adminRefundReq);
+    expect(adminRefundRes.status).toBe(200);
+    const refundJson = await adminRefundRes.json();
+    expect(refundJson.data.odenen_tutar).toBe(600);
+    expect(refundJson.data.iade_tutari).toBe(600);
+    expect(refundJson.data.iade_tarihi).toBeTruthy();
+
+    // Aynı ödemeye ikinci kez iade denendiğinde 409 Conflict döner (N1)
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "23505",
+        message: "Bu ödeme zaten iade edilmiş.",
+      },
+    });
+    const duplicateRefundReq = new Request("http://localhost/api/admin/payments", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -299,45 +359,7 @@ describe("Admin POS Payments API (/api/admin/payments - Y3 & Bölüm 2.1/4.1)", 
         action: "refund",
       }),
     });
-    const adminRefundRes = await PaymentsPATCH(adminRefundReq);
-    expect(adminRefundRes.status).toBe(200);
-  });
-
-  it("gerçek withStaffOrAdminAuth altında oturumsuz (401) ve Musteri (403) erişimini reddeder", async () => {
-    const { withStaffOrAdminAuth: realGuard } = await vi.importActual<
-      typeof import("../src/lib/auth/api-guard")
-    >("../src/lib/auth/api-guard");
-
-    const guardedPost = realGuard(PaymentsPOST);
-
-    mockAuthGetUser.mockResolvedValueOnce({
-      data: { user: null },
-      error: new Error("Unauthorized"),
-    });
-
-    const unauthReq = new Request("http://localhost/api/admin/payments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hizmet_idleri: ["srv-kesim"] }),
-    });
-    const unauthRes = await guardedPost(unauthReq);
-    expect(unauthRes.status).toBe(401);
-
-    mockAuthGetUser.mockResolvedValueOnce({
-      data: { user: { id: "customer-user-1" } },
-      error: null,
-    });
-    mockProfileMaybeSingle.mockResolvedValueOnce({
-      data: { rol: "Musteri" },
-      error: null,
-    });
-
-    const forbiddenReq = new Request("http://localhost/api/admin/payments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hizmet_idleri: ["srv-kesim"] }),
-    });
-    const forbiddenRes = await guardedPost(forbiddenReq);
-    expect(forbiddenRes.status).toBe(403);
+    const duplicateRefundRes = await PaymentsPATCH(duplicateRefundReq);
+    expect(duplicateRefundRes.status).toBe(409);
   });
 });

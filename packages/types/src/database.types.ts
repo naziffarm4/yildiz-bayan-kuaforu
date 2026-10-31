@@ -265,7 +265,7 @@ export interface Database {
         Row: {
           id: string;
           randevu_id: string | null;
-          musteri_id: string;
+          musteri_id: string | null;
           islemi_yapan_calisan_id: string;
           hizmet_adlari: string[];
           toplam_tutar: number;
@@ -276,12 +276,15 @@ export interface Database {
           bahsis_tutari: number;
           veresiye: boolean;
           gizli_not: string | null;
+          iade_tarihi: string | null;
+          iade_eden_id: string | null;
+          iade_tutari: number;
           olusturulma_tarihi: string;
         };
         Insert: {
           id?: string;
           randevu_id?: string | null;
-          musteri_id: string;
+          musteri_id?: string | null;
           islemi_yapan_calisan_id: string;
           hizmet_adlari?: string[];
           toplam_tutar: number;
@@ -292,12 +295,15 @@ export interface Database {
           bahsis_tutari?: number;
           veresiye?: boolean;
           gizli_not?: string | null;
+          iade_tarihi?: string | null;
+          iade_eden_id?: string | null;
+          iade_tutari?: number;
           olusturulma_tarihi?: string;
         };
         Update: {
           id?: string;
           randevu_id?: string | null;
-          musteri_id?: string;
+          musteri_id?: string | null;
           islemi_yapan_calisan_id?: string;
           hizmet_adlari?: string[];
           toplam_tutar?: number;
@@ -308,6 +314,9 @@ export interface Database {
           bahsis_tutari?: number;
           veresiye?: boolean;
           gizli_not?: string | null;
+          iade_tarihi?: string | null;
+          iade_eden_id?: string | null;
+          iade_tutari?: number;
           olusturulma_tarihi?: string;
         };
         Relationships: [];

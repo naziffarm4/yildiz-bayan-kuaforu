@@ -205,7 +205,7 @@ export default function AdminPage() {
           const mappedPayments: CashPayment[] = paymentRows.map((p) => ({
             id: p.id,
             randevuId: p.randevu_id ?? undefined,
-            musteriId: p.musteri_id,
+            musteriId: p.musteri_id ?? generateSafeUUID(),
             musteriAdSoyad: "Kayıtlı Müşteri",
             islemiYapanCalisanId: p.islemi_yapan_calisan_id,
             hizmetAdlari: p.hizmet_adlari,

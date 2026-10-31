@@ -48,6 +48,7 @@ export function withRole<TContext = unknown>(
       }
 
       let resolvedRole: string | null = null;
+      let profileFetchFailed = false;
       try {
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
@@ -55,11 +56,21 @@ export function withRole<TContext = unknown>(
           .eq("id", user.id)
           .maybeSingle();
 
-        if (!profileError && profile?.rol) {
+        if (profileError) {
+          profileFetchFailed = true;
+        } else if (profile?.rol) {
           resolvedRole = profile.rol;
         }
       } catch (profileErr: unknown) {
         console.warn("API Guard profil rol sorgusu uyarısı:", profileErr);
+        profileFetchFailed = true;
+      }
+
+      if (profileFetchFailed) {
+        return NextResponse.json(
+          { error: "Yetki doğrulama servisi geçici olarak kullanılamıyor." },
+          { status: 503 }
+        );
       }
 
       if (!resolvedRole) {

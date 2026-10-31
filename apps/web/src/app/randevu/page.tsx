@@ -6,10 +6,9 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageLoader } from "@/components/PageLoader";
 import { AppointmentTracker } from "@/components/AppointmentTracker";
-import type { AppointmentItem } from "@yildiz/types";
 import { Badge, Button, BookingWizardModal } from "@yildiz/ui";
 import { useAppStore } from "@/stores/app-store";
-import { toast } from "@/stores/toast-store";
+import { useCreateAppointment } from "@/hooks/use-create-appointment";
 
 function RandevuContent() {
   const searchParams = useSearchParams();
@@ -19,58 +18,8 @@ function RandevuContent() {
   const isInitialLoaded = useAppStore((s) => s.isInitialLoaded);
   const isRefreshing = useAppStore((s) => s.isRefreshing);
 
-  const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+  const { appointments, handleAppointmentCreated } = useCreateAppointment();
   const [isWizardOpen, setIsWizardOpen] = useState(true);
-
-  const handleAppointmentCreated = async (newApp: AppointmentItem) => {
-    try {
-      const res = await fetch("/api/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          musteri_ad_soyad: newApp.musteriAdSoyad,
-          musteri_telefon: newApp.musteriTelefon,
-          hizmet_idleri: newApp.hizmetIdleri,
-          tarih_saat: newApp.tarihSaat,
-          toplam_sure_dakika: newApp.toplamSureDakika,
-          notlar: newApp.not,
-          kvkk_onay: newApp.kvkkOnay ?? true,
-        }),
-      });
-
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok || !result.success) {
-        const errorMsg = result.error || "Randevu talebi oluşturulurken bir hata oluştu.";
-        toast.error(errorMsg);
-        throw new Error(errorMsg);
-      }
-
-      toast.success("Randevu talebiniz başarıyla alındı!");
-      const serverApp = result.data;
-      const formattedApp: AppointmentItem = {
-        id: serverApp.id,
-        musteriId: serverApp.musteri_id,
-        musteriAdSoyad: serverApp.musteri_ad_soyad,
-        musteriTelefon: serverApp.musteri_telefon,
-        hizmetIdleri: serverApp.hizmet_idleri,
-        calisanIdleri: serverApp.calisan_idleri || [],
-        tarihSaat: serverApp.tarih_saat,
-        toplamSureDakika: serverApp.toplam_sure_dakika,
-        durum: serverApp.durum,
-        kaynak: serverApp.kaynak,
-        not: serverApp.notlar || undefined,
-        olusturulmaTarihi: serverApp.olusturulma_tarihi,
-      };
-      setAppointments((prev) => [formattedApp, ...prev]);
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        throw err;
-      }
-      const genericErr = "Randevu talebi sunucuya iletilemedi.";
-      toast.error(genericErr);
-      throw new Error(genericErr);
-    }
-  };
 
   useEffect(() => {
     setIsWizardOpen(true);

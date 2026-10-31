@@ -5,7 +5,11 @@ import type {
   ServiceItem,
   AppointmentItem,
 } from "@yildiz/types";
-import { calculateAppointmentTotalDuration, generateSafeUUID } from "@yildiz/types";
+import {
+  calculateAppointmentTotalDuration,
+  generateSafeUUID,
+  toIstanbulIso,
+} from "@yildiz/types";
 import { Button } from "./button";
 import { Badge } from "./badge";
 
@@ -212,7 +216,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         musteriTelefon: cleanPhone,
         hizmetIdleri: selectedServiceIds,
         calisanIdleri: [],
-        tarihSaat: `${selectedDate}T${selectedTime}:00.000Z`,
+        tarihSaat: toIstanbulIso(selectedDate, selectedTime),
         toplamSureDakika: totalDuration,
         durum: "Beklemede",
         kaynak: "Web",

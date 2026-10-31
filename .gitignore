@@ -40,3 +40,8 @@ coverage/
 .claude/
 graphify-out/
 supabase/.temp/
+
+# Audit & security review reports (D-7)
+*denetim-raporu*.md
+*Guvenlik-ve-Kod-Inceleme-Raporu*.md
+*yeniden-kontrol-raporu*.md

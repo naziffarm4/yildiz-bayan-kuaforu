@@ -103,7 +103,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
                   musteri_telefon: payload.musteri_telefon ?? "+905321234567",
                   hizmet_idleri: payload.hizmet_idleri ?? ["srv-1"],
                   calisan_idleri: [],
-                  tarih_saat: payload.tarih_saat ?? "2026-10-30T10:00:00.000Z",
+                  tarih_saat: payload.tarih_saat ?? "2026-11-15T10:00:00.000Z",
                   toplam_sure_dakika: payload.toplam_sure_dakika ?? 45,
                   durum: "Beklemede",
                   kaynak: "Web",
@@ -148,7 +148,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "",
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
       }),
     });
 
@@ -167,7 +167,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "A".repeat(85),
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
       }),
     });
 
@@ -183,7 +183,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Ayşe Yılmaz",
         musteri_telefon: "",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
       }),
     });
 
@@ -202,7 +202,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Saldırgan Kullanıcı",
         musteri_telefon: "05321234567,rol.eq.Admin",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
       }),
     });
 
@@ -220,7 +220,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Ayşe Yılmaz",
         musteri_telefon: "05321234567",
         hizmet_idleri: [],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
       }),
     });
 
@@ -260,7 +260,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Ayşe Yılmaz",
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
         kvkkOnay: true,
       }),
     });
@@ -280,7 +280,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Ayşe Yılmaz",
         musteri_telefon: "0532 123 45 67",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
         toplam_sure_dakika: 999,
         notlar: "Özel fön isteği",
         kvkkOnay: true,
@@ -289,7 +289,6 @@ describe("Public Appointments API Route (/api/appointments)", () => {
 
     const res = await POST(req);
     expect(res.status).toBe(201);
-    expect(mockSelect).not.toHaveBeenCalled();
     const json = await res.json();
     expect(json.success).toBe(true);
     expect(json.data.id).toBe("app-uuid-1");
@@ -309,7 +308,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
           musteri_ad_soyad: "Ayşe Yılmaz",
           musteri_telefon: "0532 123 45 67",
           hizmet_idleri: ["srv-1"],
-          tarih_saat: "2026-10-30T10:00:00.000Z",
+          tarih_saat: "2026-11-16T10:00:00.000Z",
           kvkkOnay: true,
         }),
       });
@@ -347,7 +346,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Ayşe Yılmaz",
         musteri_telefon: "0532 123 45 67",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
         kvkkOnay: true,
       }),
     });
@@ -401,7 +400,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Misafir Kullanıcı",
         musteri_telefon: "0533 999 88 77",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
         kvkkOnay: true,
       }),
     });
@@ -460,7 +459,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Misafir Müşteri",
         musteri_telefon: "0533 999 88 77",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
         kvkkOnay: true,
       }),
     });
@@ -484,7 +483,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Fatma Demir",
         musteri_telefon: "0532 234 56 78",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
         kvkk_onay: true,
       }),
     });
@@ -504,7 +503,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Fatma Demir",
         musteri_telefon: "0532 234 56 78",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
       }),
     });
     const missingRes = await POST(missingReq);
@@ -519,7 +518,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Fatma Demir",
         musteri_telefon: "0532 234 56 78",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
         kvkkOnay: false,
       }),
     });
@@ -557,7 +556,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Ayşe Yılmaz",
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-nonexistent-id"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
         kvkkOnay: true,
       }),
     });
@@ -577,7 +576,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Ayşe Yılmaz",
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T02:00:00.000Z", // Istanbul 05:00
+        tarih_saat: "2026-11-16T02:00:00.000Z", // Istanbul 05:00
         kvkkOnay: true,
       }),
     });
@@ -659,7 +658,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Ayşe Yılmaz",
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-10-30T10:00:00.000Z",
+        tarih_saat: "2026-11-16T10:00:00.000Z",
         extra_saldiri_alani: "test",
       }),
     });
@@ -668,5 +667,199 @@ describe("Public Appointments API Route (/api/appointments)", () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.success).toBe(false);
+  });
+
+  it("hafta içi 17:00 ve 19:30 (+03:00) slotlarını kabul eder, 20:30 slotunu reddeder (Y1)", async () => {
+    // 2026-11-05 is a Thursday (weekday, 09:00 - 20:00)
+    const req1700 = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Zeynep Kaya",
+        musteri_telefon: "0532 111 22 33",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-11-05T17:00:00+03:00",
+        kvkkOnay: true,
+      }),
+    });
+    const res1700 = await POST(req1700);
+    expect(res1700.status).toBe(201);
+
+    const req1930 = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Zeynep Kaya",
+        musteri_telefon: "0532 111 22 44",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-11-05T19:30:00+03:00",
+        kvkkOnay: true,
+      }),
+    });
+    const res1930 = await POST(req1930);
+    expect(res1930.status).toBe(201);
+
+    const req2030 = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Zeynep Kaya",
+        musteri_telefon: "0532 111 22 55",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-11-05T20:30:00+03:00",
+        kvkkOnay: true,
+      }),
+    });
+    const res2030 = await POST(req2030);
+    expect(res2030.status).toBe(400);
+    const json2030 = await res2030.json();
+    expect(json2030.error).toContain("çalışma saatleri dışındadır");
+  });
+
+  it("60 günden ileri bir tarihe randevu istendiğinde 400 döner (O-6)", async () => {
+    const req = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Ayşe Yılmaz",
+        musteri_telefon: "0532 123 45 67",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2027-03-15T12:00:00+03:00",
+        kvkkOnay: true,
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error).toContain("60 gün");
+  });
+
+  it("calismaSaatleri.specialDays kuralını normal gün saatlerine göre öncelikli uygular (O-6)", async () => {
+    mockFrom.mockImplementation(
+      buildMockFrom((table: string) => {
+        if (table === "site_settings") {
+          return {
+            select: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: {
+                    calisma_saatleri: {
+                      hafta_ici: "09:00 - 20:00",
+                      specialDays: [
+                        { date: "2026-11-10", isClosed: true },
+                        { date: "2026-11-11", isClosed: false, open: "10:00", close: "14:00" },
+                      ],
+                    },
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        return null;
+      })
+    );
+
+    const closedDayReq = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Ayşe Yılmaz",
+        musteri_telefon: "0532 123 45 67",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-11-10T11:00:00+03:00",
+        kvkkOnay: true,
+      }),
+    });
+    const closedRes = await POST(closedDayReq);
+    expect(closedRes.status).toBe(400);
+
+    const afterSpecialHoursReq = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Ayşe Yılmaz",
+        musteri_telefon: "0532 123 45 67",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-11-11T15:00:00+03:00",
+        kvkkOnay: true,
+      }),
+    });
+    const afterSpecialRes = await POST(afterSpecialHoursReq);
+    expect(afterSpecialRes.status).toBe(400);
+  });
+
+  it("oturumsuz istekte mevcut doğrulanmamış misafir profilini yeniden kullanır (O-4)", async () => {
+    let insertedAppointmentPayload: Record<string, unknown> | null = null;
+    const profileInsertSpy = vi.fn();
+
+    mockFrom.mockImplementation(
+      buildMockFrom((table: string) => {
+        if (table === "profiles") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  is: vi.fn().mockReturnValue({
+                    maybeSingle: vi.fn().mockResolvedValue({
+                      data: { id: "existing-guest-profile-id" },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+            insert: profileInsertSpy,
+          };
+        }
+        if (table === "appointments") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  in: vi.fn().mockReturnValue({
+                    limit: vi.fn().mockReturnValue({
+                      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+            insert: vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+              insertedAppointmentPayload = payload;
+              return {
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { id: "app-reused-guest", ...payload },
+                    error: null,
+                  }),
+                }),
+              };
+            }),
+          };
+        }
+        return null;
+      })
+    );
+
+    const req = new Request("http://localhost/api/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        musteri_ad_soyad: "Tekrar Gelen Misafir",
+        musteri_telefon: "0532 555 66 77",
+        hizmet_idleri: ["srv-1"],
+        tarih_saat: "2026-11-05T14:00:00+03:00",
+        kvkkOnay: true,
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    expect(profileInsertSpy).not.toHaveBeenCalled();
+    expect(insertedAppointmentPayload?.["musteri_id"]).toBe("existing-guest-profile-id");
   });
 });

@@ -75,22 +75,89 @@ interface WorkingHoursCheck {
   error?: string;
 }
 
+interface RawSpecialDayEntry {
+  date?: string;
+  tarih?: string;
+  isClosed?: boolean;
+  kapali?: boolean;
+  open?: string;
+  close?: string;
+  ozelSaatler?: string;
+}
+
 function checkBusinessHours(
   apptDate: Date,
-  calismaSaatleri: Record<string, unknown>
+  calismaSaatleri: Record<string, unknown>,
+  extraSpecialDays?: RawSpecialDayEntry[]
 ): WorkingHoursCheck {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
     weekday: "short",
     hour: "numeric",
     minute: "numeric",
     hourCycle: "h23",
   });
   const parts = formatter.formatToParts(apptDate);
+  const yyyy = parts.find((p) => p.type === "year")?.value ?? "";
+  const mm = parts.find((p) => p.type === "month")?.value ?? "";
+  const dd = parts.find((p) => p.type === "day")?.value ?? "";
+  const istanbulDateKey = `${yyyy}-${mm}-${dd}`;
   const weekday = parts.find((p) => p.type === "weekday")?.value;
   const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
   const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
   const apptMinutes = hour * 60 + minute;
+
+  const specialDaysList: RawSpecialDayEntry[] = [
+    ...(Array.isArray(calismaSaatleri.specialDays)
+      ? (calismaSaatleri.specialDays as RawSpecialDayEntry[])
+      : []),
+    ...(Array.isArray(extraSpecialDays) ? extraSpecialDays : []),
+  ];
+
+  const matchedSpecialDay = specialDaysList.find(
+    (sd) => (sd?.date ?? sd?.tarih) === istanbulDateKey
+  );
+
+  if (matchedSpecialDay) {
+    const isClosed = matchedSpecialDay.isClosed ?? matchedSpecialDay.kapali ?? false;
+    if (isClosed) {
+      return {
+        valid: false,
+        error: `Salonumuz ${istanbulDateKey} tarihinde özel gün / resmi tatil nedeniyle hizmet vermemektedir (Kapalı).`,
+      };
+    }
+
+    const customRange =
+      matchedSpecialDay.open && matchedSpecialDay.close
+        ? `${matchedSpecialDay.open} - ${matchedSpecialDay.close}`
+        : matchedSpecialDay.ozelSaatler;
+
+    if (customRange) {
+      if (/kapalı|kapali|closed/i.test(customRange)) {
+        return {
+          valid: false,
+          error: `Salonumuz ${istanbulDateKey} tarihinde hizmet vermemektedir (Kapalı).`,
+        };
+      }
+      const specialMatch = customRange.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
+      if (specialMatch) {
+        const openMinutes = Number(specialMatch[1]) * 60 + Number(specialMatch[2]);
+        const closeMinutes = Number(specialMatch[3]) * 60 + Number(specialMatch[4]);
+        if (apptMinutes < openMinutes || apptMinutes >= closeMinutes) {
+          const openFormatted = `${specialMatch[1]?.padStart(2, "0")}:${specialMatch[2]}`;
+          const closeFormatted = `${specialMatch[3]?.padStart(2, "0")}:${specialMatch[4]}`;
+          return {
+            valid: false,
+            error: `Randevu saati özel gün çalışma saatleri dışındadır (${openFormatted} - ${closeFormatted}).`,
+          };
+        }
+        return { valid: true };
+      }
+    }
+  }
 
   let dayKeyCandidates: string[] = [];
   let dayNameTr = "Seçilen gün";
@@ -237,17 +304,27 @@ export async function POST(request: Request) {
       notlar,
     } = validated.data;
 
-    // 1. Geçmiş Tarih Kontrolü (O9)
-    const apptDate = new Date(tarihSaat);
+    // 1. Saat Dilimi Normalizasyonu (Y1) & Geçmiş / İleri Tarih Kontrolü (O9, O-6)
+    const hasOffset = /(?:Z|[+-]\d{2}:\d{2})$/i.test(tarihSaat);
+    const isoCandidate = hasOffset ? tarihSaat : `${tarihSaat}+03:00`;
+    const apptDate = new Date(isoCandidate);
     if (isNaN(apptDate.getTime())) {
       return NextResponse.json(
         { success: false, error: "Geçerli bir tarih ve saat formatı giriniz." },
         { status: 400 }
       );
     }
+    const normalizedIso = apptDate.toISOString();
+
     if (apptDate.getTime() < Date.now()) {
       return NextResponse.json(
         { success: false, error: "Geçmiş tarihe randevu alınamaz." },
+        { status: 400 }
+      );
+    }
+    if (apptDate.getTime() > Date.now() + 60 * 24 * 60 * 60 * 1000) {
+      return NextResponse.json(
+        { success: false, error: "En fazla 60 gün sonrasına randevu alınabilir." },
         { status: 400 }
       );
     }
@@ -264,12 +341,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Çalışma Saatleri & Kapalı Günler Kontrolü (O9)
+    // 2. Çalışma Saatleri & Özel Günler Kontrolü (O9, O-6)
     let rawCalismaSaatleri: Record<string, unknown> | null = null;
+    let extraSpecialDays: RawSpecialDayEntry[] | undefined;
     try {
       const { data: settingsData } = await supabaseAdmin
         .from("site_settings")
-        .select("calisma_saatleri")
+        .select("calisma_saatleri, sayfa_metinleri")
         .limit(1)
         .maybeSingle();
 
@@ -279,13 +357,23 @@ export async function POST(request: Request) {
       ) {
         rawCalismaSaatleri = settingsData.calisma_saatleri as Record<string, unknown>;
       }
-    } catch {
-      // Ayarlar tablosu okunamazsa varsayılan SALON_INFO kullanılır
+      if (
+        settingsData?.sayfa_metinleri &&
+        typeof settingsData.sayfa_metinleri === "object"
+      ) {
+        const textsObj = settingsData.sayfa_metinleri as Record<string, unknown>;
+        if (Array.isArray(textsObj.specialDays)) {
+          extraSpecialDays = textsObj.specialDays as RawSpecialDayEntry[];
+        }
+      }
+    } catch (settingsErr: unknown) {
+      console.warn("Ayarlar tablosu okunamadı, varsayılan çalışma saatleri kullanılıyor:", settingsErr);
     }
 
     const businessHoursCheck = checkBusinessHours(
       apptDate,
-      rawCalismaSaatleri ?? (SALON_INFO.calismaSaatleri as unknown as Record<string, unknown>)
+      rawCalismaSaatleri ?? (SALON_INFO.calismaSaatleri as unknown as Record<string, unknown>),
+      extraSpecialDays
     );
     if (!businessHoursCheck.valid) {
       return NextResponse.json(
@@ -309,7 +397,8 @@ export async function POST(request: Request) {
       if (!error && Array.isArray(data)) {
         servicesData = data as { id: string; tahmini_sure_dakika: number }[];
       }
-    } catch {
+    } catch (srvErr: unknown) {
+      console.warn("Hizmetler sorgulanırken hata oluştu:", srvErr);
       servicesData = null;
     }
 
@@ -335,7 +424,7 @@ export async function POST(request: Request) {
         .from("appointments")
         .select("id, durum")
         .eq("musteri_telefon", targetPhone)
-        .eq("tarih_saat", tarihSaat)
+        .eq("tarih_saat", normalizedIso)
         .in("durum", ["Beklemede", "Onaylandı"])
         .limit(1)
         .maybeSingle();
@@ -350,11 +439,11 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
-    } catch {
-      // Sorgu desteklenmiyorsa devam et
+    } catch (dupErr: unknown) {
+      console.warn("Mükerrer randevu kontrolü atlandı:", dupErr);
     }
 
-    // 3. Müşteri Profili Çözümlemesi (G-06: Oturumsuz istekte başkasının profiline telefonla bağlama yapılmaz)
+    // 3. Müşteri Profili Çözümlemesi (G-06 & O-4: Oturumsuz istekte doğrulanmış hesaba bağlanmaz; varsa mevcut misafir profili yeniden kullanılır)
     let musteriId: string | null = null;
 
     try {
@@ -369,7 +458,25 @@ export async function POST(request: Request) {
       console.warn("Oturum bilgisi okunamadı, misafir akışına devam ediliyor:", authErr);
     }
 
-    // Oturum yoksa yalnızca yeni misafir profili eklemeyi dene; mevcut hesaba telefonla bağlama yapma
+    // Oturum yoksa önce aynı telefona ait doğrulanmamış misafir profilini ara, yoksa yeni oluştur (O-4)
+    if (!musteriId) {
+      try {
+        const { data: existingGuest } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("telefon", targetPhone)
+          .eq("sms_dogrulandi", false)
+          .is("eposta", null)
+          .maybeSingle();
+
+        if (existingGuest?.id) {
+          musteriId = existingGuest.id;
+        }
+      } catch (guestLookupErr: unknown) {
+        console.warn("Mevcut misafir profili aranamadı:", guestLookupErr);
+      }
+    }
+
     if (!musteriId) {
       const nameParts = musteriAdSoyad.split(" ");
       const ad = nameParts[0] || musteriAdSoyad;
@@ -396,12 +503,13 @@ export async function POST(request: Request) {
         } else {
           musteriId = null;
         }
-      } catch {
+      } catch (profileCreateErr: unknown) {
+        console.warn("Misafir profili oluşturulamadı:", profileCreateErr);
         musteriId = null;
       }
     }
 
-    // 4. Randevuyu kaydet
+    // 4. Randevuyu kaydet (K-7: yalnızca gerekli sütunları döndür)
     const appointmentId = generateSafeUUID();
     const { data: appointment, error: appointmentError } = await supabaseAdmin
       .from("appointments")
@@ -412,14 +520,16 @@ export async function POST(request: Request) {
         musteri_telefon: targetPhone,
         hizmet_idleri: hizmetIdleri,
         calisan_idleri: [],
-        tarih_saat: tarihSaat,
+        tarih_saat: normalizedIso,
         toplam_sure_dakika: computedDuration,
         durum: "Beklemede",
         kaynak: "Web",
         notlar,
         kvkk_onay_tarihi: new Date().toISOString(),
       })
-      .select("*")
+      .select(
+        "id, musteri_id, musteri_ad_soyad, musteri_telefon, hizmet_idleri, calisan_idleri, tarih_saat, toplam_sure_dakika, durum, kaynak, notlar, olusturulma_tarihi"
+      )
       .single();
 
     if (appointmentError || !appointment) {

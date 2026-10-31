@@ -502,6 +502,21 @@ export function calculateAppointmentTotalDuration(
 const ISTANBUL_OFFSET_MS = 3 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * YYYY-MM-DD ve HH:mm formatındaki tarih-saati Türkiye sabit saat dilimiyle (+03:00)
+ * doğrular ve ISO-8601 formatına dönüştürür.
+ */
+export function toIstanbulIso(dateStr: string, timeStr: string): string {
+  const cleanDate = dateStr.trim();
+  const cleanTime = timeStr.trim();
+  const isoWithOffset = `${cleanDate}T${cleanTime}:00+03:00`;
+  const parsed = new Date(isoWithOffset);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Geçersiz tarih veya saat formatı: ${cleanDate} ${cleanTime}`);
+  }
+  return isoWithOffset;
+}
+
 function parseWorkingWindow(rangeStr?: string | null): { openMinutes: number; closeMinutes: number } | null {
   if (!rangeStr) return null;
   const normalized = rangeStr.toLowerCase();

@@ -12,7 +12,11 @@ import {
   isDuplicateIdempotencyKey,
   recordIdempotencyKey,
 } from "@/lib/rate-limit";
-import { generateSafeUUID } from "@yildiz/types";
+import {
+  checkIstanbulBusinessHours,
+  generateSafeUUID,
+  type FlexibleSpecialDay,
+} from "@yildiz/types";
 import { SALON_INFO } from "@/lib/site-defaults";
 
 const RawAppointmentBodySchema = z
@@ -69,161 +73,6 @@ const NormalizedAppointmentSchema = z
     }),
   })
   .strict();
-
-interface WorkingHoursCheck {
-  valid: boolean;
-  error?: string;
-}
-
-interface RawSpecialDayEntry {
-  date?: string;
-  tarih?: string;
-  isClosed?: boolean;
-  kapali?: boolean;
-  open?: string;
-  close?: string;
-  ozelSaatler?: string;
-}
-
-function checkBusinessHours(
-  apptDate: Date,
-  calismaSaatleri: Record<string, unknown>,
-  extraSpecialDays?: RawSpecialDayEntry[]
-): WorkingHoursCheck {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Istanbul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "short",
-    hour: "numeric",
-    minute: "numeric",
-    hourCycle: "h23",
-  });
-  const parts = formatter.formatToParts(apptDate);
-  const yyyy = parts.find((p) => p.type === "year")?.value ?? "";
-  const mm = parts.find((p) => p.type === "month")?.value ?? "";
-  const dd = parts.find((p) => p.type === "day")?.value ?? "";
-  const istanbulDateKey = `${yyyy}-${mm}-${dd}`;
-  const weekday = parts.find((p) => p.type === "weekday")?.value;
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
-  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
-  const apptMinutes = hour * 60 + minute;
-
-  const specialDaysList: RawSpecialDayEntry[] = [
-    ...(Array.isArray(calismaSaatleri.specialDays)
-      ? (calismaSaatleri.specialDays as RawSpecialDayEntry[])
-      : []),
-    ...(Array.isArray(extraSpecialDays) ? extraSpecialDays : []),
-  ];
-
-  const matchedSpecialDay = specialDaysList.find(
-    (sd) => (sd?.date ?? sd?.tarih) === istanbulDateKey
-  );
-
-  if (matchedSpecialDay) {
-    const isClosed = matchedSpecialDay.isClosed ?? matchedSpecialDay.kapali ?? false;
-    if (isClosed) {
-      return {
-        valid: false,
-        error: `Salonumuz ${istanbulDateKey} tarihinde özel gün / resmi tatil nedeniyle hizmet vermemektedir (Kapalı).`,
-      };
-    }
-
-    const customRange =
-      matchedSpecialDay.open && matchedSpecialDay.close
-        ? `${matchedSpecialDay.open} - ${matchedSpecialDay.close}`
-        : matchedSpecialDay.ozelSaatler;
-
-    if (customRange) {
-      if (/kapalı|kapali|closed/i.test(customRange)) {
-        return {
-          valid: false,
-          error: `Salonumuz ${istanbulDateKey} tarihinde hizmet vermemektedir (Kapalı).`,
-        };
-      }
-      const specialMatch = customRange.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
-      if (specialMatch) {
-        const openMinutes = Number(specialMatch[1]) * 60 + Number(specialMatch[2]);
-        const closeMinutes = Number(specialMatch[3]) * 60 + Number(specialMatch[4]);
-        if (apptMinutes < openMinutes || apptMinutes >= closeMinutes) {
-          const openFormatted = `${specialMatch[1]?.padStart(2, "0")}:${specialMatch[2]}`;
-          const closeFormatted = `${specialMatch[3]?.padStart(2, "0")}:${specialMatch[4]}`;
-          return {
-            valid: false,
-            error: `Randevu saati özel gün çalışma saatleri dışındadır (${openFormatted} - ${closeFormatted}).`,
-          };
-        }
-        return { valid: true };
-      }
-    }
-  }
-
-  let dayKeyCandidates: string[] = [];
-  let dayNameTr = "Seçilen gün";
-
-  if (weekday === "Sun") {
-    dayKeyCandidates = ["pazar", "Pazar", "sunday", "Sunday"];
-    dayNameTr = "Pazar";
-  } else if (weekday === "Sat") {
-    dayKeyCandidates = ["cumartesi", "Cumartesi", "saturday", "Saturday"];
-    dayNameTr = "Cumartesi";
-  } else {
-    dayKeyCandidates = [
-      "hafta_ici",
-      "haftaIci",
-      "haftaici",
-      "weekday",
-      "pazartesi",
-      "sali",
-      "carsamba",
-      "persembe",
-      "cuma",
-    ];
-    dayNameTr = "Hafta içi";
-  }
-
-  let scheduleStr: string | null = null;
-  for (const key of dayKeyCandidates) {
-    const val = calismaSaatleri[key];
-    if (typeof val === "string" && val.trim().length > 0) {
-      scheduleStr = val.trim();
-      break;
-    }
-  }
-
-  if (!scheduleStr) {
-    if (weekday === "Sun") scheduleStr = "10:00 - 18:00";
-    else if (weekday === "Sat") scheduleStr = "09:00 - 20:30";
-    else scheduleStr = "09:00 - 20:00";
-  }
-
-  if (/kapalı|kapali|closed/i.test(scheduleStr)) {
-    return {
-      valid: false,
-      error: `Salonumuz ${dayNameTr} günleri hizmet vermemektedir (Kapalı).`,
-    };
-  }
-
-  const match = scheduleStr.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
-  if (!match) {
-    return { valid: true };
-  }
-
-  const openMinutes = Number(match[1]) * 60 + Number(match[2]);
-  const closeMinutes = Number(match[3]) * 60 + Number(match[4]);
-
-  if (apptMinutes < openMinutes || apptMinutes >= closeMinutes) {
-    const openFormatted = `${match[1]?.padStart(2, "0")}:${match[2]}`;
-    const closeFormatted = `${match[3]?.padStart(2, "0")}:${match[4]}`;
-    return {
-      valid: false,
-      error: `Randevu saati çalışma saatleri dışındadır. ${dayNameTr} çalışma saatlerimiz: ${openFormatted} - ${closeFormatted}`,
-    };
-  }
-
-  return { valid: true };
-}
 
 export async function POST(request: Request) {
   try {
@@ -343,7 +192,7 @@ export async function POST(request: Request) {
 
     // 2. Çalışma Saatleri & Özel Günler Kontrolü (O9, O-6)
     let rawCalismaSaatleri: Record<string, unknown> | null = null;
-    let extraSpecialDays: RawSpecialDayEntry[] | undefined;
+    let extraSpecialDays: FlexibleSpecialDay[] | undefined;
     try {
       const { data: settingsData } = await supabaseAdmin
         .from("site_settings")
@@ -363,14 +212,14 @@ export async function POST(request: Request) {
       ) {
         const textsObj = settingsData.sayfa_metinleri as Record<string, unknown>;
         if (Array.isArray(textsObj.specialDays)) {
-          extraSpecialDays = textsObj.specialDays as RawSpecialDayEntry[];
+          extraSpecialDays = textsObj.specialDays as FlexibleSpecialDay[];
         }
       }
     } catch (settingsErr: unknown) {
       console.warn("Ayarlar tablosu okunamadı, varsayılan çalışma saatleri kullanılıyor:", settingsErr);
     }
 
-    const businessHoursCheck = checkBusinessHours(
+    const businessHoursCheck = checkIstanbulBusinessHours(
       apptDate,
       rawCalismaSaatleri ?? (SALON_INFO.calismaSaatleri as unknown as Record<string, unknown>),
       extraSpecialDays

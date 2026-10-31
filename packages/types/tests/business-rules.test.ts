@@ -7,6 +7,11 @@ import {
   calculateAppointmentTotalDuration,
   calculateElapsedWorkingMinutes,
   isPendingAppointmentExpired,
+  checkIstanbulBusinessHours,
+  normalizeWorkingHours,
+  parseWorkingWindow,
+  formatTRY,
+  normalizeTrPhone,
   generateSafeUUID,
   formatFacebookUrl,
   AppointmentStatusSchema,
@@ -243,4 +248,53 @@ describe("İş Kuralları - Bekleyen Randevu 30 Dk Çalışma Saatleri Süre Dol
     expect(elapsedSpecialOpen).toBe(20);
   });
 });
+
+describe("Ortak Yardımcılar - checkIstanbulBusinessHours, normalizeWorkingHours, formatTRY ve normalizeTrPhone", () => {
+  it("parseWorkingWindow hem kısa tire (-) hem uzun tire (–) destekler", () => {
+    expect(parseWorkingWindow("09:00 - 20:00")?.openMinutes).toBe(540);
+    expect(parseWorkingWindow("09:00 – 20:30")?.closeMinutes).toBe(1230);
+    expect(parseWorkingWindow("Kapalı")).toBeNull();
+  });
+
+  it("normalizeWorkingHours farklı anahtar isimlendirmelerini tek yapıda birleştirir", () => {
+    const normalized = normalizeWorkingHours({
+      hafta_ici: "09:30 - 19:30",
+      Cumartesi: "10:00 - 20:00",
+    });
+    expect(normalized.haftaIci).toBe("09:30 - 19:30");
+    expect(normalized.cumartesi).toBe("10:00 - 20:00");
+    expect(normalized.pazar).toBe("10:00 - 18:00");
+  });
+
+  it("checkIstanbulBusinessHours hafta içi ve özel gün saatlerini doğru denetler", () => {
+    const okResult = checkIstanbulBusinessHours(
+      new Date("2026-11-05T14:00:00+03:00"),
+      { haftaIci: "09:00 - 20:00" },
+    );
+    expect(okResult.valid).toBe(true);
+
+    const closedSpecial = checkIstanbulBusinessHours(
+      new Date("2026-11-10T11:00:00+03:00"),
+      {
+        haftaIci: "09:00 - 20:00",
+        specialDays: [{ date: "2026-11-10", isClosed: true }],
+      },
+    );
+    expect(closedSpecial.valid).toBe(false);
+    expect(closedSpecial.error).toContain("Kapalı");
+  });
+
+  it("formatTRY tutarları Türkçe para birimi formatında döndürür", () => {
+    expect(formatTRY(1250)).toBe("1.250 ₺");
+    expect(formatTRY(0)).toBe("0 ₺");
+  });
+
+  it("normalizeTrPhone telefon numaralarını +90 E.164 formatına dönüştürür", () => {
+    expect(normalizeTrPhone("0532 123 45 67")).toBe("+905321234567");
+    expect(normalizeTrPhone("5321234567")).toBe("+905321234567");
+    expect(normalizeTrPhone("+90 532 123 45 67")).toBe("+905321234567");
+    expect(normalizeTrPhone("")).toBe("");
+  });
+});
+
 

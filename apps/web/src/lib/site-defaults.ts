@@ -1,8 +1,9 @@
-import type {
-  SalonInfo,
-  PageTexts,
-  BookingRules,
-  SpecialDay,
+import {
+  DEFAULT_WORKING_HOURS,
+  type SalonInfo,
+  type PageTexts,
+  type BookingRules,
+  type SpecialDay,
 } from "@yildiz/types";
 
 export const SALON_INFO: SalonInfo = {
@@ -17,9 +18,9 @@ export const SALON_INFO: SalonInfo = {
   tiktok: "@yildizkuafor",
   facebook: "yildizbayankuaforu",
   calismaSaatleri: {
-    haftaIci: "09:00 - 20:00",
-    cumartesi: "09:00 - 20:30",
-    pazar: "10:00 - 18:00 (Özel Randevulu)",
+    haftaIci: DEFAULT_WORKING_HOURS.haftaIci,
+    cumartesi: DEFAULT_WORKING_HOURS.cumartesi,
+    pazar: `${DEFAULT_WORKING_HOURS.pazar} (Özel Randevulu)`,
   },
   varsayilanTamponSureDakika: 15,
 };

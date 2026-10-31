@@ -1,36 +1,15 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { isPendingAppointmentExpired, type SpecialDay } from "@yildiz/types";
+import {
+  isPendingAppointmentExpired,
+  normalizeWorkingHours,
+  type SpecialDay,
+} from "@yildiz/types";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { verifyCronRequest } from "@/lib/auth/cron-auth";
 import { safeErrorResponse } from "@/lib/api-utils";
-import { SALON_INFO, DEFAULT_SPECIAL_DAYS } from "@/lib/site-defaults";
-
-function normalizeWorkingHours(raw: unknown): Record<string, string> {
-  if (typeof raw === "object" && raw !== null) {
-    const obj = raw as Record<string, unknown>;
-    return {
-      haftaIci:
-        typeof obj.haftaIci === "string"
-          ? obj.haftaIci
-          : typeof obj.hafta_ici === "string"
-          ? obj.hafta_ici
-          : SALON_INFO.calismaSaatleri.haftaIci,
-      cumartesi:
-        typeof obj.cumartesi === "string"
-          ? obj.cumartesi
-          : SALON_INFO.calismaSaatleri.cumartesi,
-      pazar:
-        typeof obj.pazar === "string" ? obj.pazar : SALON_INFO.calismaSaatleri.pazar,
-    };
-  }
-  return {
-    haftaIci: SALON_INFO.calismaSaatleri.haftaIci,
-    cumartesi: SALON_INFO.calismaSaatleri.cumartesi,
-    pazar: SALON_INFO.calismaSaatleri.pazar,
-  };
-}
+import { DEFAULT_SPECIAL_DAYS } from "@/lib/site-defaults";
 
 function extractSpecialDays(rawTexts: unknown): SpecialDay[] {
   if (typeof rawTexts === "object" && rawTexts !== null) {

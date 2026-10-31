@@ -517,13 +517,25 @@ export function toIstanbulIso(dateStr: string, timeStr: string): string {
   return isoWithOffset;
 }
 
-function parseWorkingWindow(rangeStr?: string | null): { openMinutes: number; closeMinutes: number } | null {
+export const DEFAULT_WORKING_HOURS = {
+  haftaIci: "09:00 - 20:00",
+  cumartesi: "09:00 - 20:30",
+  pazar: "10:00 - 18:00",
+} as const;
+
+export function parseWorkingWindow(
+  rangeStr?: string | null,
+): { openMinutes: number; closeMinutes: number; openFormatted: string; closeFormatted: string } | null {
   if (!rangeStr) return null;
   const normalized = rangeStr.toLowerCase();
-  if (normalized.includes("kapalı") || normalized.includes("kapali")) {
+  if (
+    normalized.includes("kapalı") ||
+    normalized.includes("kapali") ||
+    normalized.includes("closed")
+  ) {
     return null;
   }
-  const match = rangeStr.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+  const match = rangeStr.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
   if (!match) return null;
 
   const openHour = Number(match[1]);
@@ -534,7 +546,210 @@ function parseWorkingWindow(rangeStr?: string | null): { openMinutes: number; cl
   const openMinutes = openHour * 60 + openMin;
   const closeMinutes = closeHour * 60 + closeMin;
   if (closeMinutes <= openMinutes) return null;
-  return { openMinutes, closeMinutes };
+  return {
+    openMinutes,
+    closeMinutes,
+    openFormatted: `${String(openHour).padStart(2, "0")}:${String(openMin).padStart(2, "0")}`,
+    closeFormatted: `${String(closeHour).padStart(2, "0")}:${String(closeMin).padStart(2, "0")}`,
+  };
+}
+
+export function normalizeWorkingHours(raw: unknown): {
+  haftaIci: string;
+  cumartesi: string;
+  pazar: string;
+} {
+  if (typeof raw === "object" && raw !== null) {
+    const obj = raw as Record<string, unknown>;
+    const pick = (candidates: string[], fallback: string): string => {
+      for (const key of candidates) {
+        const val = obj[key];
+        if (typeof val === "string" && val.trim().length > 0) {
+          return val.trim();
+        }
+      }
+      return fallback;
+    };
+
+    return {
+      haftaIci: pick(
+        [
+          "haftaIci",
+          "hafta_ici",
+          "haftaici",
+          "weekday",
+          "pazartesi",
+          "sali",
+          "carsamba",
+          "persembe",
+          "cuma",
+        ],
+        DEFAULT_WORKING_HOURS.haftaIci,
+      ),
+      cumartesi: pick(
+        ["cumartesi", "Cumartesi", "saturday", "Saturday"],
+        DEFAULT_WORKING_HOURS.cumartesi,
+      ),
+      pazar: pick(
+        ["pazar", "Pazar", "sunday", "Sunday"],
+        DEFAULT_WORKING_HOURS.pazar,
+      ),
+    };
+  }
+
+  return {
+    haftaIci: DEFAULT_WORKING_HOURS.haftaIci,
+    cumartesi: DEFAULT_WORKING_HOURS.cumartesi,
+    pazar: DEFAULT_WORKING_HOURS.pazar,
+  };
+}
+
+export interface FlexibleSpecialDay {
+  id?: string;
+  tarih?: string;
+  date?: string;
+  aciklama?: string;
+  kapali?: boolean;
+  isClosed?: boolean;
+  ozelSaatler?: string;
+  open?: string;
+  close?: string;
+}
+
+export function checkIstanbulBusinessHours(
+  apptDate: Date,
+  rawCalismaSaatleri?: unknown,
+  specialDays?: readonly FlexibleSpecialDay[],
+): { valid: boolean; error?: string } {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+    hour: "numeric",
+    minute: "numeric",
+    hourCycle: "h23",
+  });
+  const parts = formatter.formatToParts(apptDate);
+  const yyyy = parts.find((p) => p.type === "year")?.value ?? "";
+  const mm = parts.find((p) => p.type === "month")?.value ?? "";
+  const dd = parts.find((p) => p.type === "day")?.value ?? "";
+  const istanbulDateKey = `${yyyy}-${mm}-${dd}`;
+  const weekday = parts.find((p) => p.type === "weekday")?.value;
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const apptMinutes = hour * 60 + minute;
+
+  const rawObj =
+    typeof rawCalismaSaatleri === "object" && rawCalismaSaatleri !== null
+      ? (rawCalismaSaatleri as Record<string, unknown>)
+      : {};
+
+  const combinedSpecialDays: FlexibleSpecialDay[] = [
+    ...(Array.isArray(rawObj.specialDays)
+      ? (rawObj.specialDays as FlexibleSpecialDay[])
+      : []),
+    ...(Array.isArray(specialDays) ? specialDays : []),
+  ];
+
+  const matchedSpecialDay = combinedSpecialDays.find(
+    (sd) => (sd?.date ?? sd?.tarih) === istanbulDateKey,
+  );
+
+  if (matchedSpecialDay) {
+    const isClosed = matchedSpecialDay.isClosed ?? matchedSpecialDay.kapali ?? false;
+    if (isClosed) {
+      return {
+        valid: false,
+        error: `Salonumuz ${istanbulDateKey} tarihinde özel gün / resmi tatil nedeniyle hizmet vermemektedir (Kapalı).`,
+      };
+    }
+
+    const customRange =
+      matchedSpecialDay.open && matchedSpecialDay.close
+        ? `${matchedSpecialDay.open} - ${matchedSpecialDay.close}`
+        : matchedSpecialDay.ozelSaatler;
+
+    if (customRange) {
+      if (/kapalı|kapali|closed/i.test(customRange)) {
+        return {
+          valid: false,
+          error: `Salonumuz ${istanbulDateKey} tarihinde hizmet vermemektedir (Kapalı).`,
+        };
+      }
+      const specialWindow = parseWorkingWindow(customRange);
+      if (specialWindow) {
+        if (
+          apptMinutes < specialWindow.openMinutes ||
+          apptMinutes >= specialWindow.closeMinutes
+        ) {
+          return {
+            valid: false,
+            error: `Randevu saati özel gün çalışma saatleri dışındadır (${specialWindow.openFormatted} - ${specialWindow.closeFormatted}).`,
+          };
+        }
+        return { valid: true };
+      }
+    }
+  }
+
+  const normalizedHours = normalizeWorkingHours(rawCalismaSaatleri);
+  let scheduleStr: string;
+  let dayNameTr: string;
+
+  if (weekday === "Sun") {
+    scheduleStr = normalizedHours.pazar;
+    dayNameTr = "Pazar";
+  } else if (weekday === "Sat") {
+    scheduleStr = normalizedHours.cumartesi;
+    dayNameTr = "Cumartesi";
+  } else {
+    scheduleStr = normalizedHours.haftaIci;
+    dayNameTr = "Hafta içi";
+  }
+
+  if (/kapalı|kapali|closed/i.test(scheduleStr)) {
+    return {
+      valid: false,
+      error: `Salonumuz ${dayNameTr} günleri hizmet vermemektedir (Kapalı).`,
+    };
+  }
+
+  const windowRange = parseWorkingWindow(scheduleStr);
+  if (!windowRange) {
+    return { valid: true };
+  }
+
+  if (apptMinutes < windowRange.openMinutes || apptMinutes >= windowRange.closeMinutes) {
+    return {
+      valid: false,
+      error: `Randevu saati çalışma saatleri dışındadır. ${dayNameTr} çalışma saatlerimiz: ${windowRange.openFormatted} - ${windowRange.closeFormatted}`,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Türk Lirası para birimi biçimlendirici (örn: 1.250 ₺)
+ */
+export function formatTRY(amount: number): string {
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+  return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(safeAmount)} ₺`;
+}
+
+/**
+ * Telefon numarasını Türkiye E.164 standardına (+905XXXXXXXXX) dönüştürür.
+ */
+export function normalizeTrPhone(raw: string): string {
+  const cleanPhone = raw.replace(/\D/g, "");
+  if (!cleanPhone) return "";
+  return cleanPhone.startsWith("90")
+    ? `+${cleanPhone}`
+    : cleanPhone.startsWith("0")
+      ? `+90${cleanPhone.slice(1)}`
+      : `+90${cleanPhone}`;
 }
 
 /**

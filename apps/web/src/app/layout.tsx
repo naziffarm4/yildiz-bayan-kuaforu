@@ -7,6 +7,7 @@ import { AppBootstrapper } from "@/components/AppBootstrapper";
 import { Toaster } from "@/components/Toaster";
 import { NavigationProgressBar } from "@/components/NavigationProgressBar";
 import { SALON_INFO } from "@/lib/site-defaults";
+import { DEFAULT_WORKING_HOURS } from "@yildiz/types";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || "https://yildizbayankuaforu.com";
@@ -64,7 +65,11 @@ const salonJsonLd = {
     addressCountry: "TR",
   },
   hasMap: SALON_INFO.googleHaritaUrl,
-  openingHours: ["Mo-Fr 09:00-20:00", "Sa 09:00-20:30", "Su 10:00-18:00"],
+  openingHours: [
+    `Mo-Fr ${DEFAULT_WORKING_HOURS.haftaIci.replace(/\s+/g, "")}`,
+    `Sa ${DEFAULT_WORKING_HOURS.cumartesi.replace(/\s+/g, "")}`,
+    `Su ${DEFAULT_WORKING_HOURS.pazar.replace(/\s+/g, "")}`,
+  ],
   priceRange: "₺₺₺",
 };
 

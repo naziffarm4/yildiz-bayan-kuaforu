@@ -184,17 +184,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOtp({
         phone: formattedPhone,
+        options: { shouldCreateUser: false },
       });
 
       if (error) {
-        return { success: false, error: error.message };
+        console.warn("SMS OTP gönderim uyarısı:", error.message);
+        return {
+          success: false,
+          error: "SMS doğrulama kodu gönderilemedi. Lütfen bilgilerinizi kontrol ediniz.",
+        };
       }
 
       return { success: true };
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "SMS doğrulama kodu gönderilemedi.";
-      return { success: false, error: msg };
+      console.warn("SMS OTP gönderim hatası:", err);
+      return {
+        success: false,
+        error: "SMS doğrulama kodu gönderilemedi. Lütfen daha sonra tekrar deneyiniz.",
+      };
     }
   },
 
@@ -287,7 +294,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
-        return { success: false, error: error.message };
+        console.warn("E-posta kayıt uyarısı:", error.message);
+        return {
+          success: false,
+          error: "Kayıt işlemi gerçekleştirilemedi. Lütfen bilgilerinizi kontrol ediniz.",
+        };
       }
 
       if (data?.user) {
@@ -303,9 +314,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return { success: true, user: profile };
       }
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Kayıt sırasında bir hata oluştu.";
-      return { success: false, error: message };
+      console.warn("E-posta kayıt hatası:", err);
+      return {
+        success: false,
+        error: "Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyiniz.",
+      };
     }
 
     return { success: false, error: "Kayıt işlemi gerçekleştirilemedi." };

@@ -97,7 +97,7 @@ describe("Google Reviews Sync API Routes", () => {
   });
 
   describe("Cron Sync Route (/api/cron/sync-google-reviews)", () => {
-    it("CRON_SECRET tanımlı değilse 500 hatası döner (S5)", async () => {
+    it("CRON_SECRET tanımlı değilse bilgi sızdırmadan 401 hatası döner (S5, D-4)", async () => {
       const origSecret = process.env.CRON_SECRET;
       delete process.env.CRON_SECRET;
 
@@ -107,9 +107,9 @@ describe("Google Reviews Sync API Routes", () => {
         },
       });
       const res = await CronSyncGET(req);
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(401);
       const json = await res.json();
-      expect(json.error).toContain("CRON_SECRET");
+      expect(json.error).toBe("Yetkisiz erişim.");
 
       if (origSecret) {
         process.env.CRON_SECRET = origSecret;

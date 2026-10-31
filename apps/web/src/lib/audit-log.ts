@@ -28,7 +28,7 @@ export async function recordAuditLog(input: AuditLogInput): Promise<void> {
       metadata: (input.metadata ?? {}) as unknown as Json,
       ip_address: input.ipAddress ?? null,
     });
-  } catch {
-    // Denetim kaydı hatası ana iş akışını kesintiye uğratmaz
+  } catch (err: unknown) {
+    console.error("[audit-log] Denetim kaydı yazılamadı:", err);
   }
 }

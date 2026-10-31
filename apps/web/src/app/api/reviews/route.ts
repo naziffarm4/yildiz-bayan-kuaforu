@@ -75,9 +75,24 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-    }
 
-    const isHighRating = puan >= 4;
+      try {
+        const { data: existingReview } = await supabase
+          .from("customer_reviews")
+          .select("id")
+          .eq("randevu_id", randevuId)
+          .maybeSingle();
+
+        if (existingReview && "id" in existingReview && existingReview.id) {
+          return NextResponse.json(
+            { error: "Bu randevu için daha önce değerlendirme yapılmıştır." },
+            { status: 409 }
+          );
+        }
+      } catch (dupCheckErr: unknown) {
+        console.warn("Mükerrer yorum kontrolü atlandı:", dupCheckErr);
+      }
+    }
 
     // Şartname Madde 15 & 16: Müşteri yorumları moderasyonludur (aktif: false)
     const { data, error } = await supabase
@@ -91,7 +106,7 @@ export async function POST(request: Request) {
         kaynak: "Hizmet Sonrası",
         aktif: false,
       })
-      .select("*")
+      .select("id, musteri_adi, hizmet_turu, puan, yorum, olusturulma_tarihi")
       .single();
 
     if (error) {
@@ -101,10 +116,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       data,
-      funnel: isHighRating ? "google" : "internal",
-      message: isHighRating
-        ? "Değerlendirmeniz için çok teşekkür ederiz!"
-        : "Geri bildiriminiz için teşekkür ederiz. Memnuniyetiniz adına sizinle iletişime geçeceğiz.",
+      funnel: "google",
+      message: "Değerlendirmeniz için çok teşekkür ederiz!",
     });
   } catch (err: unknown) {
     return safeErrorResponse("Değerlendirme kaydedilemedi.", 500, err);

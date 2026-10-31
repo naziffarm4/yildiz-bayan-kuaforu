@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { withAdminAuth, withStaffOrAdminAuth } from "@/lib/auth/api-guard";
 import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
+import { recordAuditLog } from "@/lib/audit-log";
 import type { Database } from "@yildiz/types";
 
 const AdminGalleryPostSchema = z
@@ -100,6 +101,13 @@ export const POST = withAdminAuth(async (request: Request) => {
       return safeErrorResponse("Galeri öğesi eklenemedi.", 500, error);
     }
 
+    await recordAuditLog({
+      action: "gallery.create",
+      entityType: "gallery_items",
+      entityId: data?.id ?? null,
+      metadata: { baslik: body.baslik, kategori: body.kategori },
+    });
+
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {
     return safeErrorResponse("Sunucu hatası.", 500, err);
@@ -130,6 +138,12 @@ export const DELETE = withAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Galeri öğesi silinemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "gallery.delete",
+      entityType: "gallery_items",
+      entityId: id,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
@@ -178,6 +192,13 @@ export const PATCH = withAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Galeri öğesi güncellenemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "gallery.update",
+      entityType: "gallery_items",
+      entityId: id,
+      metadata: updates as Record<string, unknown>,
+    });
 
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {

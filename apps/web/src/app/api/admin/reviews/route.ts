@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { withAdminAuth, withStaffOrAdminAuth } from "@/lib/auth/api-guard";
 import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
+import { recordAuditLog } from "@/lib/audit-log";
 import type { Database } from "@yildiz/types";
 
 const AdminReviewPostSchema = z.object({
@@ -81,6 +82,13 @@ export const POST = withAdminAuth(async (request: Request) => {
       return safeErrorResponse("Yorum eklenemedi.", 500, error);
     }
 
+    await recordAuditLog({
+      action: "review.create",
+      entityType: "customer_reviews",
+      entityId: data?.id ?? null,
+      metadata: { musteri_adi: body.musteri_adi, puan: body.puan ?? 5 },
+    });
+
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {
     return safeErrorResponse("Sunucu hatası.", 500, err);
@@ -111,6 +119,12 @@ export const DELETE = withAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Yorum silinemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "review.delete",
+      entityType: "customer_reviews",
+      entityId: id,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
@@ -149,6 +163,13 @@ export const PATCH = withAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Yorum güncellenemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "review.update",
+      entityType: "customer_reviews",
+      entityId: id,
+      metadata: updates as Record<string, unknown>,
+    });
 
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {

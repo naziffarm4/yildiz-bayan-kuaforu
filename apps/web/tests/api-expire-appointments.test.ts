@@ -74,7 +74,7 @@ describe("Expire Pending Appointments Cron Route (/api/cron/expire-appointments)
     updatedIds.length = 0;
   });
 
-  it("CRON_SECRET tanımlı değilse veya çok kısaysa 500 hatası döner", async () => {
+  it("CRON_SECRET tanımlı değilse veya 32 karakterden kısaysa yapılandırma sızdırmadan 401 döner (D-4)", async () => {
     const orig = process.env.CRON_SECRET;
     delete process.env.CRON_SECRET;
 
@@ -82,13 +82,15 @@ describe("Expire Pending Appointments Cron Route (/api/cron/expire-appointments)
       headers: { Authorization: "Bearer test-secret" },
     });
     const res = await GET(req);
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.error).toBe("Yetkisiz erişim.");
 
     if (orig) process.env.CRON_SECRET = orig;
   });
 
   it("Authorization Bearer başlığı geçersizse 401 döner", async () => {
-    process.env.CRON_SECRET = "secure-cron-secret-2026-min-16-chars";
+    process.env.CRON_SECRET = "secure-cron-secret-2026-min-32-chars-ok";
 
     const req = new Request("http://localhost/api/cron/expire-appointments");
     const res = await GET(req);
@@ -96,12 +98,12 @@ describe("Expire Pending Appointments Cron Route (/api/cron/expire-appointments)
   });
 
   it("Geçerli CRON_SECRET ile çalışma saatlerine göre süresi dolan Beklemede randevuları 'Süresi Doldu' yapar", async () => {
-    process.env.CRON_SECRET = "secure-cron-secret-2026-min-16-chars";
+    process.env.CRON_SECRET = "secure-cron-secret-2026-min-32-chars-ok";
 
     const req = new Request(
       "http://localhost/api/cron/expire-appointments?now=2026-10-28T10:00:00%2B03:00",
       {
-        headers: { Authorization: "Bearer secure-cron-secret-2026-min-16-chars" },
+        headers: { Authorization: "Bearer secure-cron-secret-2026-min-32-chars-ok" },
       }
     );
     const res = await GET(req);

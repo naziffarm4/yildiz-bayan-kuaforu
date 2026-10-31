@@ -11,6 +11,7 @@ export interface GalleryManagerProps {
   onAddPhoto: (photo: Omit<GalleryItem, "id" | "begeniSayisi">) => void;
   onDeletePhoto: (id: string) => void;
   onUpdatePhoto?: (id: string, updates: Partial<GalleryItem>) => Promise<void> | void;
+  onModerateComment?: (commentId: string, aktif: boolean) => Promise<void> | void;
 }
 
 const CATEGORIES = [
@@ -33,6 +34,7 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
   onAddPhoto,
   onDeletePhoto,
   onUpdatePhoto,
+  onModerateComment,
 }) => {
   const [activeCategory, setActiveCategory] = useState<string>("Tümü");
   const [isAdding, setIsAdding] = useState(false);
@@ -130,7 +132,7 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
   // Yorum Moderasyon Modalı State
   const [moderatingItem, setModeratingItem] = useState<GalleryItem | null>(null);
   const [itemComments, setItemComments] = useState<
-    Array<{ id: string; musteri_adi: string; yorum: string; olusturulma_tarihi: string }>
+    Array<{ id: string; musteri_adi: string; yorum: string; aktif?: boolean; olusturulma_tarihi: string }>
   >([]);
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [commentDeleteStatus, setCommentDeleteStatus] = useState<string | null>(null);
@@ -153,6 +155,32 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
       console.warn("Galeri yorumları yüklenemedi:", err);
     } finally {
       setIsCommentsLoading(false);
+    }
+  };
+
+  const handleToggleCommentApproval = async (commentId: string, nextAktif: boolean) => {
+    try {
+      if (onModerateComment) {
+        await onModerateComment(commentId, nextAktif);
+      } else {
+        const res = await fetch("/api/admin/gallery/comments", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: commentId, aktif: nextAktif }),
+        });
+        if (!res.ok) throw new Error("Moderasyon başarısız");
+      }
+
+      setItemComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, aktif: nextAktif } : c))
+      );
+      setCommentDeleteStatus(
+        nextAktif ? "Yorum onaylandı ve yayına alındı ✅" : "Yorum gizlendi ✅"
+      );
+      setTimeout(() => setCommentDeleteStatus(null), 3000);
+    } catch (err: unknown) {
+      console.warn("Yorum onay durumu güncellenemedi:", err);
+      setCommentDeleteStatus("Yorum durumu güncellenirken hata oluştu.");
     }
   };
 
@@ -631,10 +659,13 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
                     className="p-3.5 bg-white rounded-xl border border-border shadow-2xs flex items-start justify-between gap-3"
                   >
                     <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-serif font-bold text-xs text-text-primary">
                           {comment.musteri_adi}
                         </span>
+                        <Badge variant={comment.aktif ? "gold" : "outline"}>
+                          {comment.aktif ? "Yayında" : "Onay Bekliyor"}
+                        </Badge>
                         <span className="text-[10px] text-text-secondary">
                           {new Date(comment.olusturulma_tarihi).toLocaleDateString("tr-TR", {
                             day: "numeric",
@@ -649,18 +680,30 @@ export const GalleryManager: React.FC<GalleryManagerProps> = ({
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm(`"${comment.musteri_adi}" tarafından yapılan yorumu silmek istediğinize emin misiniz?`)) {
-                          handleDeleteComment(comment.id);
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleToggleCommentApproval(comment.id, !comment.aktif)
                         }
-                      }}
-                      className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 rounded hover:bg-red-50 transition-colors shrink-0"
-                      title="Yorumu Sil"
-                    >
-                      Sil
-                    </button>
+                        className="text-xs font-semibold px-2.5 py-1 rounded border border-border bg-bg-secondary text-text-primary hover:border-accent-gold hover:text-accent-gold transition-colors"
+                      >
+                        {comment.aktif ? "Gizle" : "Onayla / Yayına Al"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`"${comment.musteri_adi}" tarafından yapılan yorumu silmek istediğinize emin misiniz?`)) {
+                            handleDeleteComment(comment.id);
+                          }
+                        }}
+                        className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 rounded hover:bg-red-50 transition-colors shrink-0"
+                        title="Yorumu Sil"
+                      >
+                        Sil
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

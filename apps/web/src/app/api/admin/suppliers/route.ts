@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { withStaffOrAdminAuth } from "@/lib/auth/api-guard";
 import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
+import { recordAuditLog } from "@/lib/audit-log";
 import type { Database } from "@yildiz/types";
 
 const AdminSupplierPostSchema = z
@@ -94,6 +95,16 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
       return safeErrorResponse("Tedarikçi eklenemedi.", 500, error);
     }
 
+    await recordAuditLog({
+      action: "supplier.create",
+      entityType: "suppliers",
+      entityId: data?.id ?? null,
+      metadata: {
+        firma_adi: body.firma_adi ?? body.firmaAdi,
+        yetkili_kisi: body.yetkili_kisi ?? body.yetkiliKisi,
+      },
+    });
+
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {
     return safeErrorResponse("Sunucu hatası.", 500, err);
@@ -124,6 +135,12 @@ export const DELETE = withStaffOrAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Tedarikçi silinemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "supplier.delete",
+      entityType: "suppliers",
+      entityId: id,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
@@ -169,6 +186,13 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Tedarikçi güncellenemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "supplier.update",
+      entityType: "suppliers",
+      entityId: id,
+      metadata: updates as Record<string, unknown>,
+    });
 
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {

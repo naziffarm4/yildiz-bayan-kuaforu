@@ -70,10 +70,24 @@ export async function GET(request: Request) {
     const workingHours = normalizeWorkingHours(settingsRow?.calisma_saatleri);
     const specialDays: SpecialDay[] = extractSpecialDays(settingsRow?.sayfa_metinleri);
 
-    const { data: pendingRows, error: fetchError } = await supabase
+    const cutoffIso = new Date(
+      new Date(nowIso).getTime() - timeoutMinutes * 60_000
+    ).toISOString();
+
+    let pendingQuery = supabase
       .from("appointments")
       .select("id, durum, olusturulma_tarihi")
       .eq("durum", "Beklemede");
+
+    if (typeof (pendingQuery as unknown as { lt?: unknown }).lt === "function") {
+      pendingQuery = (
+        pendingQuery as unknown as {
+          lt: (col: string, val: string) => typeof pendingQuery;
+        }
+      ).lt("olusturulma_tarihi", cutoffIso);
+    }
+
+    const { data: pendingRows, error: fetchError } = await pendingQuery;
 
     if (fetchError) {
       return safeErrorResponse("Bekleyen randevular sorgulanamadı.", 500, fetchError);

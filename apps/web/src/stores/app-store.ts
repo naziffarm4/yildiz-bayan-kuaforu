@@ -81,6 +81,7 @@ export interface AppState {
   fetchGalleryComments: (galleryId: string) => Promise<void>;
   toggleGalleryLike: (galleryId: string) => Promise<void>;
   addGalleryComment: (galleryId: string, author: string, commentText: string) => Promise<boolean>;
+  moderateGalleryComment: (commentId: string, aktif: boolean) => Promise<void>;
   deleteGalleryComment: (galleryId: string, commentId: string) => Promise<boolean>;
   updateGalleryItem: (id: string, updates: Partial<GalleryItem>) => Promise<void>;
   addGalleryItem: (item: GalleryItem) => Promise<void>;
@@ -661,6 +662,26 @@ export const useAppStore = create<AppState>((set: SetState<AppState>, get: GetSt
     } catch (err) {
       console.error("addGalleryComment hatası:", err);
       return false;
+    }
+  },
+
+  moderateGalleryComment: async (commentId, aktif) => {
+    set((state) => {
+      const updatedMap: Record<string, GalleryCommentRow[]> = {};
+      for (const [gid, list] of Object.entries(state.commentsByItem)) {
+        updatedMap[gid] = list.map((c) => (c.id === commentId ? { ...c, aktif } : c));
+      }
+      return { commentsByItem: updatedMap };
+    });
+
+    try {
+      await fetch(getApiUrl("/api/admin/gallery/comments"), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: commentId, aktif }),
+      });
+    } catch (err) {
+      console.error("moderateGalleryComment hatası:", err);
     }
   },
 

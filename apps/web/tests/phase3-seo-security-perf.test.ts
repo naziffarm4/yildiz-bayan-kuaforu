@@ -23,13 +23,15 @@ describe("Faz 3: Güvenlik Başlıkları, Görsel Optimizasyonu ve SEO Yapıland
       const hostnames = patterns.map((p: { hostname: string }) => p.hostname);
 
       expect(hostnames).toContain("images.unsplash.com");
-      expect(hostnames).toContain("*.supabase.co");
+      expect(hostnames).not.toContain("*.supabase.co");
       expect(hostnames).not.toContain("*.supabase.in");
 
       const supabasePattern = patterns.find(
-        (p: { hostname: string; pathname?: string }) => p.hostname === "*.supabase.co"
+        (p: { hostname: string; pathname?: string }) =>
+          p.pathname === "/storage/v1/object/public/**"
       );
-      expect(supabasePattern?.pathname).toBe("/storage/v1/object/public/**");
+      expect(supabasePattern).toBeDefined();
+      expect(supabasePattern?.hostname).not.toContain("*");
     });
 
     it("Tüm rotalar (/(.*)) için zorunlu güvenlik başlıklarını (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) döner", async () => {

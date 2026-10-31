@@ -5,12 +5,13 @@ export function verifyCronRequest(
   request: Request
 ): { authorized: true } | { authorized: false; response: NextResponse } {
   const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret || cronSecret.length < 16) {
+  if (!cronSecret || cronSecret.length < 32) {
+    console.error("[cron-auth] CRON_SECRET eksik veya 32 karakterden kısa.");
     return {
       authorized: false,
       response: NextResponse.json(
-        { error: "Sunucu yapılandırma hatası: CRON_SECRET tanımlı değil veya çok kısa." },
-        { status: 500 }
+        { error: "Yetkisiz erişim." },
+        { status: 401 }
       ),
     };
   }

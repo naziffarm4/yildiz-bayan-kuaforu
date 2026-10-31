@@ -116,6 +116,7 @@ export default function AdminPage() {
   const storeUpdateGalleryItem = useAppStore((s) => s.updateGalleryItem);
   const storeDeleteGalleryItem = useAppStore((s) => s.deleteGalleryItem);
   const storeAddGalleryItem = useAppStore((s) => s.addGalleryItem);
+  const storeModerateGalleryComment = useAppStore((s) => s.moderateGalleryComment);
 
   // Randevudan POS'a aktarım için ara state
   const [selectedAppointmentForPOS, setSelectedAppointmentForPOS] = useState<AppointmentItem | null>(null);
@@ -986,6 +987,7 @@ export default function AdminPage() {
               onAddPhoto={handleAddPhoto}
               onDeletePhoto={handleDeletePhoto}
               onUpdatePhoto={handleUpdatePhoto}
+              onModerateComment={storeModerateGalleryComment}
             />
           )}
 

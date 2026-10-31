@@ -1,3 +1,13 @@
+const supabaseHostname = (() => {
+  try {
+    return process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+      : "project.supabase.co";
+  } catch {
+    return "project.supabase.co";
+  }
+})();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@yildiz/ui", "@yildiz/types"],
@@ -16,7 +26,7 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "*.supabase.co",
+        hostname: supabaseHostname,
         pathname: "/storage/v1/object/public/**",
       },
     ],

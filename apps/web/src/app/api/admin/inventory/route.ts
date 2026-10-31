@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { withStaffOrAdminAuth } from "@/lib/auth/api-guard";
 import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
+import { recordAuditLog } from "@/lib/audit-log";
 import type { Database } from "@yildiz/types";
 
 const AdminInventoryPostSchema = z
@@ -91,6 +92,17 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
       return safeErrorResponse("Stok ürünü eklenemedi.", 500, error);
     }
 
+    await recordAuditLog({
+      action: "inventory.create",
+      entityType: "inventory",
+      entityId: data?.id ?? null,
+      metadata: {
+        urun_adi: body.urun_adi ?? body.urunAdi,
+        kategori: body.kategori,
+        miktar: body.miktar,
+      },
+    });
+
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {
     return safeErrorResponse("Sunucu hatası.", 500, err);
@@ -121,6 +133,12 @@ export const DELETE = withStaffOrAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Stok ürünü silinemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "inventory.delete",
+      entityType: "inventory",
+      entityId: id,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
@@ -167,6 +185,13 @@ export const PATCH = withStaffOrAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Stok ürünü güncellenemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "inventory.update",
+      entityType: "inventory",
+      entityId: id,
+      metadata: updates as Record<string, unknown>,
+    });
 
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {

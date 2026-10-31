@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { withAdminAuth, withStaffOrAdminAuth } from "@/lib/auth/api-guard";
 import { parseJsonBody, safeErrorResponse } from "@/lib/api-utils";
+import { recordAuditLog } from "@/lib/audit-log";
 import type { Database } from "@yildiz/types";
 
 const AdminServicePostSchema = z
@@ -103,6 +104,13 @@ export const POST = withAdminAuth(async (request: Request) => {
       return safeErrorResponse("Hizmet eklenemedi.", 500, error);
     }
 
+    await recordAuditLog({
+      action: "service.create",
+      entityType: "services",
+      entityId: data?.id ?? null,
+      metadata: { ad: body.ad, kategori: body.kategori, fiyat: body.fiyat },
+    });
+
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {
     return safeErrorResponse("Sunucu hatası.", 500, err);
@@ -133,6 +141,12 @@ export const DELETE = withAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Hizmet silinemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "service.delete",
+      entityType: "services",
+      entityId: id,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
@@ -180,6 +194,13 @@ export const PATCH = withAdminAuth(async (request: Request) => {
     if (error) {
       return safeErrorResponse("Hizmet güncellenemedi.", 500, error);
     }
+
+    await recordAuditLog({
+      action: "service.update",
+      entityType: "services",
+      entityId: id,
+      metadata: updates as Record<string, unknown>,
+    });
 
     return NextResponse.json({ success: true, data });
   } catch (err: unknown) {

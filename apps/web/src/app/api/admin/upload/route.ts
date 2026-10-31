@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { withStaffOrAdminAuth } from "@/lib/auth/api-guard";
 import { safeErrorResponse } from "@/lib/api-utils";
+import { recordAuditLog } from "@/lib/audit-log";
 
 const ALLOWED_FOLDERS = ["gallery", "services", "sliders", "staff", "general"] as const;
 type AllowedFolder = (typeof ALLOWED_FOLDERS)[number];
@@ -46,7 +47,7 @@ function sanitizeBaseName(fileName: string): string {
 
 function verifyMagicBytes(buffer: Buffer, mimeType: string): boolean {
   if (buffer.length < 12) {
-    return true;
+    return false;
   }
 
   switch (mimeType) {
@@ -136,6 +137,13 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
       const { data: publicUrlData } = supabase.storage
         .from("salon-media")
         .getPublicUrl(storagePath);
+
+      await recordAuditLog({
+        action: "media.signed_upload_url",
+        entityType: "storage",
+        entityId: storagePath,
+        metadata: { folder: folderInput, mimeType, fileName: uniqueFileName },
+      });
 
       return NextResponse.json({
         success: true,
@@ -228,6 +236,18 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
             .getPublicUrl(storagePath);
 
           if (publicUrlData?.publicUrl) {
+            await recordAuditLog({
+              action: "media.upload",
+              entityType: "storage",
+              entityId: storagePath,
+              metadata: {
+                folder,
+                mimeType,
+                fileName: uniqueFileName,
+                url: publicUrlData.publicUrl,
+              },
+            });
+
             return NextResponse.json({
               success: true,
               url: publicUrlData.publicUrl,
@@ -256,6 +276,13 @@ export const POST = withStaffOrAdminAuth(async (request: Request) => {
     await fs.writeFile(localFilePath, buffer);
 
     const localUrl = `/uploads/${folder}/${uniqueFileName}`;
+
+    await recordAuditLog({
+      action: "media.upload_local",
+      entityType: "storage",
+      entityId: storagePath,
+      metadata: { folder, mimeType, fileName: uniqueFileName, url: localUrl },
+    });
 
     return NextResponse.json({
       success: true,

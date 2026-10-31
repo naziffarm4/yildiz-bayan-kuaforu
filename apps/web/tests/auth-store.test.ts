@@ -130,13 +130,14 @@ describe("Zustand useAuthStore Mimarisi (Single Source of Truth)", () => {
     expect(mockUpdateUser).toHaveBeenCalledWith({ password: "YeniSifre123!" });
   });
 
-  it("sendPhoneOtp geçerli Türkiye mobil numarasıyla supabase.auth.signInWithOtp çağırır (G-04)", async () => {
+  it("sendPhoneOtp geçerli Türkiye mobil numarasıyla supabase.auth.signInWithOtp (shouldCreateUser: false) çağırır (G-04, O-3)", async () => {
     mockSignInWithOtp.mockResolvedValue({ data: {}, error: null });
 
     const result = await useAuthStore.getState().sendPhoneOtp("0532 100 00 01");
     expect(result.success).toBe(true);
     expect(mockSignInWithOtp).toHaveBeenCalledWith({
       phone: "+905321000001",
+      options: { shouldCreateUser: false },
     });
   });
 

@@ -721,10 +721,13 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
 
     it("dosya uzantısını istemci dosya adından değil doğrulanmış MIME_TO_EXT haritasından türetir", async () => {
       mockStorageUpload.mockResolvedValueOnce({ error: null });
+      const validPngHeader = new Uint8Array([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+      ]);
       const formData = new FormData();
       formData.append(
         "file",
-        new File([new Uint8Array([1, 2, 3])], "shell.php", { type: "image/png" })
+        new File([validPngHeader], "shell.php", { type: "image/png" })
       );
       formData.append("folder", "gallery");
 
@@ -748,10 +751,13 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       mockStorageUpload.mockResolvedValueOnce({ error: { message: "Bucket error" } });
 
       try {
+        const validWebpHeader = new Uint8Array([
+          0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+        ]);
         const formData = new FormData();
         formData.append(
           "file",
-          new File([new Uint8Array([1, 2, 3])], "test.webp", { type: "image/webp" })
+          new File([validWebpHeader], "test.webp", { type: "image/webp" })
         );
         formData.append("folder", "services");
 
@@ -765,6 +771,24 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       } finally {
         envRecord.NODE_ENV = origEnv;
       }
+    });
+
+    it("12 bayttan kısa dosyayı magic byte kontrolünde reddeder (D-9)", async () => {
+      const shortBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File([shortBytes], "tiny.png", { type: "image/png" })
+      );
+      formData.append("folder", "gallery");
+
+      const req = new Request("http://localhost/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const res = await AdminUploadPOST(req);
+      expect(res.status).toBe(400);
     });
 
     it("magic byte imzası beyan edilen MIME türüyle uyuşmayan dosyayı 400 ile reddeder (G-10)", async () => {
@@ -981,7 +1005,7 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       expect(json.funnel).toBe("google");
     });
 
-    it("POST 2 yıldızlı değerlendirmede 'internal' funnel döner", async () => {
+    it("POST 2 yıldızlı değerlendirmede de review gating yapmadan 'google' funnel döner (O-5)", async () => {
       const req = new Request("http://localhost/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -997,7 +1021,7 @@ describe("Admin Tam CRUD API Rotaları ve Google Metinsiz Yorum Testleri", () =>
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
-      expect(json.funnel).toBe("internal");
+      expect(json.funnel).toBe("google");
     });
 
     it("POST musteri_adi eksikse 400 döner", async () => {

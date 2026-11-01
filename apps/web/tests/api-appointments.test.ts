@@ -593,7 +593,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
       })
     );
 
-    // 2026-11-01 is a Sunday
+    // 2026-11-15 is a Sunday
     const req = new Request("http://localhost/api/appointments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -601,7 +601,7 @@ describe("Public Appointments API Route (/api/appointments)", () => {
         musteri_ad_soyad: "Ayşe Yılmaz",
         musteri_telefon: "05321234567",
         hizmet_idleri: ["srv-1"],
-        tarih_saat: "2026-11-01T11:00:00.000Z",
+        tarih_saat: "2026-11-15T11:00:00.000Z",
         kvkkOnay: true,
       }),
     });

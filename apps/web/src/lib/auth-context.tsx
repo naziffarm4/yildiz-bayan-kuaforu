@@ -30,7 +30,12 @@ export interface AuthContextType {
     telefon: string,
     email: string,
     password: string
-  ) => Promise<{ success: boolean; error?: string; user?: AuthUser | null }>;
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    user?: AuthUser | null;
+    requiresEmailConfirmation?: boolean;
+  }>;
   loginWithGoogle: (redirectToPath?: string) => Promise<{ user?: AuthUser | null; error?: string }>;
   updateProfile: (
     data: Partial<AuthUser>

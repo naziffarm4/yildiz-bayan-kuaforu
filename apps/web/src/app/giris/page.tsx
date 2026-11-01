@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button, Card, Badge, PasswordInput } from "@yildiz/ui";
 import { useAuth } from "@/lib/auth-context";
+import { useAuthStore } from "@/stores/auth-store";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 import { toast } from "@/stores/toast-store";
 import { PageLoader } from "@/components/PageLoader";
@@ -17,7 +18,11 @@ function LoginForm() {
   const redirectParam = searchParams.get("redirect") || searchParams.get("next");
   const safeRedirect = safeRedirectPath(redirectParam, undefined, "") || null;
 
-  const [authMethod, setAuthMethod] = useState<"phone" | "email">("phone");
+  const initialTab =
+    searchParams.get("method") === "email" || searchParams.get("tab") === "email"
+      ? "email"
+      : "phone";
+  const [authMethod, setAuthMethod] = useState<"phone" | "email">(initialTab);
 
   // Telefon Formu
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -30,6 +35,23 @@ function LoginForm() {
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleRedirecting, setGoogleRedirecting] = useState(false);
+
+  useEffect(() => {
+    const methodParam = searchParams.get("method") || searchParams.get("tab");
+    if (methodParam === "email") {
+      setAuthMethod("email");
+    }
+
+    const errorParam = searchParams.get("error");
+    if (errorParam === "oauth") {
+      setError("Google ile giriş tamamlanamadı. Lütfen tekrar deneyiniz veya farklı bir yöntem seçiniz.");
+    } else if (errorParam === "unauthorized") {
+      setError("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
+    } else if (errorParam === "configuration") {
+      setError("Kimlik doğrulama yapılandırması eksik. Lütfen yönetici ile iletişime geçiniz.");
+    }
+  }, [searchParams]);
 
   const redirectUserByRole = (role: "Musteri" | "Calisan" | "Admin") => {
     if (
@@ -106,7 +128,7 @@ function LoginForm() {
       toast.success("Hoş geldiniz! Giriş başarılı.");
       redirectUserByRole(loggedUser.rol);
     } else {
-      const err = "Giriş bilgileri doğrulanamadı.";
+      const err = useAuthStore.getState().authError || "Giriş bilgileri doğrulanamadı.";
       setError(err);
       toast.error(err);
     }
@@ -115,11 +137,12 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     setError(null);
     setLoading(true);
+    setGoogleRedirecting(false);
     try {
       const result = await loginWithGoogle(safeRedirect || undefined);
-      setLoading(false);
 
       if (result?.error) {
+        setLoading(false);
         let msg = `Google ile giriş başarısız: ${result.error}`;
         if (
           result.error.toLowerCase().includes("provider is not enabled") ||
@@ -133,11 +156,16 @@ function LoginForm() {
       }
 
       if (result?.user) {
+        setLoading(false);
         toast.success("Google ile giriş başarılı!");
         redirectUserByRole(result.user.rol);
+        return;
       }
+
+      setGoogleRedirecting(true);
     } catch (err: unknown) {
       setLoading(false);
+      setGoogleRedirecting(false);
       const message =
         err instanceof Error
           ? err.message
@@ -195,14 +223,17 @@ function LoginForm() {
         )}
 
         {/* Giriş Yöntemi Sekmeleri */}
-        <div className="flex border-b border-border text-xs font-semibold">
+        <div role="tablist" className="flex border-b border-border text-xs font-semibold">
           <button
             type="button"
+            role="tab"
+            aria-selected={authMethod === "phone"}
             onClick={() => {
               setAuthMethod("phone");
+              setLoading(false);
               setError(null);
             }}
-            className={`flex-1 pb-2 text-center transition-colors ${
+            className={`flex-1 pb-2 text-center transition-colors cursor-pointer ${
               authMethod === "phone"
                 ? "border-b-2 border-accent-gold text-text-primary font-bold"
                 : "text-text-secondary hover:text-text-primary"
@@ -212,11 +243,14 @@ function LoginForm() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={authMethod === "email"}
             onClick={() => {
               setAuthMethod("email");
+              setLoading(false);
               setError(null);
             }}
-            className={`flex-1 pb-2 text-center transition-colors ${
+            className={`flex-1 pb-2 text-center transition-colors cursor-pointer ${
               authMethod === "email"
                 ? "border-b-2 border-accent-gold text-text-primary font-bold"
                 : "text-text-secondary hover:text-text-primary"
@@ -331,8 +365,8 @@ function LoginForm() {
           <button
             type="button"
             onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-border bg-bg-secondary hover:bg-border-main text-xs font-semibold text-text-primary transition-colors shadow-2xs"
+            disabled={loading || googleRedirecting}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-border bg-bg-secondary hover:bg-border-main text-xs font-semibold text-text-primary transition-colors shadow-2xs cursor-pointer disabled:opacity-60"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -352,7 +386,7 @@ function LoginForm() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            Google ile Giriş Yap
+            {googleRedirecting ? "Google'a yönlendiriliyorsunuz..." : "Google ile Giriş Yap"}
           </button>
         </div>
 

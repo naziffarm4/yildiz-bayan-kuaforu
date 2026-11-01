@@ -36,6 +36,7 @@ describe("Zustand useAuthStore Mimarisi (Single Source of Truth)", () => {
       appointments: [],
       isLoading: false,
       isGoogleUser: false,
+      authError: null,
     });
   });
 
@@ -163,7 +164,7 @@ describe("Zustand useAuthStore Mimarisi (Single Source of Truth)", () => {
     expect(useAuthStore.getState().user).toBeNull();
   });
 
-  it("loginWithEmail yanlış şifre veya Supabase hatasında sahte Admin kullanıcısı üretmez (G-04 / K-01)", async () => {
+  it("loginWithEmail yanlış şifre veya Supabase hatasında sahte Admin kullanıcısı üretmez ve authError yazar (G-04 / K-01)", async () => {
     mockSignInWithPassword.mockResolvedValue({
       data: { user: null },
       error: new Error("Invalid login credentials"),
@@ -171,9 +172,31 @@ describe("Zustand useAuthStore Mimarisi (Single Source of Truth)", () => {
 
     const user = await useAuthStore
       .getState()
-      .loginWithEmail("admin@yildizkuafor.com", "yanlisSifre123");
+      .loginWithEmail("  admin@yildizkuafor.com  ", "yanlisSifre123");
+    expect(mockSignInWithPassword).toHaveBeenCalledWith({
+      email: "admin@yildizkuafor.com",
+      password: "yanlisSifre123",
+    });
     expect(user).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
+    expect(useAuthStore.getState().authError).toBe(
+      "E-posta adresi veya şifre hatalı. Lütfen bilgilerinizi kontrol ediniz."
+    );
+  });
+
+  it("loginWithEmail doğrulanmamış e-posta hatasında anlamlı Türkçe authError yazar", async () => {
+    mockSignInWithPassword.mockResolvedValue({
+      data: { user: null },
+      error: new Error("Email not confirmed"),
+    });
+
+    const user = await useAuthStore
+      .getState()
+      .loginWithEmail("musteri@yildizkuafor.com", "GecerliSifre123");
+    expect(user).toBeNull();
+    expect(useAuthStore.getState().authError).toBe(
+      "E-posta adresiniz henüz doğrulanmamış. Lütfen e-posta kutunuzdaki onay bağlantısına tıklayınız."
+    );
   });
 
   it("registerWithEmail 8 karakterden kısa şifreyi reddeder ve Supabase hatasında sahte kullanıcı üretmez", async () => {
@@ -192,6 +215,38 @@ describe("Zustand useAuthStore Mimarisi (Single Source of Truth)", () => {
       .getState()
       .registerWithEmail("Ayşe", "Yılmaz", "05321112233", "ayse@example.com", "GecerliSifre123");
     expect(failRes.success).toBe(false);
+    expect(failRes.error).toBe(
+      "Bu e-posta adresi ile zaten bir hesap bulunmaktadır. Lütfen giriş yapınız."
+    );
+    expect(useAuthStore.getState().user).toBeNull();
+  });
+
+  it("registerWithEmail session dönmediğinde requiresEmailConfirmation: true döner ve oturum açmaz", async () => {
+    mockSignUp.mockResolvedValue({
+      data: {
+        user: {
+          id: "u-new-1",
+          email: "yeni@example.com",
+          user_metadata: { ad: "Ayşe", soyad: "Yılmaz", telefon: "+905321112233" },
+        },
+        session: null,
+      },
+      error: null,
+    });
+    mockFrom.mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
+    });
+
+    const res = await useAuthStore
+      .getState()
+      .registerWithEmail("Ayşe", "Yılmaz", "05321112233", "yeni@example.com", "GecerliSifre123");
+
+    expect(res.success).toBe(true);
+    expect(res.requiresEmailConfirmation).toBe(true);
     expect(useAuthStore.getState().user).toBeNull();
   });
 

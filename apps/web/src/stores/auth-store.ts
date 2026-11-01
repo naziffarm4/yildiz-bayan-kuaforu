@@ -9,6 +9,7 @@ export interface AuthState {
   appointments: AppointmentItem[];
   isLoading: boolean;
   isGoogleUser: boolean;
+  authError: string | null;
 
   // Actions
   setUser: (user: AuthUser | null, isGoogleUser?: boolean) => void;
@@ -24,7 +25,12 @@ export interface AuthState {
     telefon: string,
     email: string,
     password: string
-  ) => Promise<{ success: boolean; error?: string; user?: AuthUser | null }>;
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    user?: AuthUser | null;
+    requiresEmailConfirmation?: boolean;
+  }>;
   loginWithGoogle: (redirectToPath?: string) => Promise<{ user?: AuthUser | null; error?: string }>;
   updateProfile: (patch: Partial<AuthUser>) => Promise<{ success: boolean; error?: string }>;
   updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
@@ -81,6 +87,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   appointments: [],
   isLoading: true,
   isGoogleUser: false,
+  authError: null,
 
   setUser: (user, isGoogleUser) => {
     set({
@@ -238,16 +245,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   loginWithEmail: async (email: string, pass: string): Promise<AuthUser | null> => {
-    if (!email || !pass) return null;
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !pass) return null;
+
+    set({ authError: null });
 
     try {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password: pass,
       });
 
-      if (!error && data?.user) {
+      if (error) {
+        const lowerMsg = error.message.toLowerCase();
+        const friendlyError = lowerMsg.includes("email not confirmed")
+          ? "E-posta adresiniz henüz doğrulanmamış. Lütfen e-posta kutunuzdaki onay bağlantısına tıklayınız."
+          : "E-posta adresi veya şifre hatalı. Lütfen bilgilerinizi kontrol ediniz.";
+        set({ authError: friendlyError });
+        return null;
+      }
+
+      if (data?.user) {
         const profile = await fetchUserProfile(
           supabase,
           data.user.id,
@@ -258,7 +277,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return profile;
       }
     } catch {
-      // Hata durumunda sahte kullanıcı üretilmez
+      set({ authError: "Giriş sırasında bir bağlantı hatası oluştu. Lütfen tekrar deneyiniz." });
     }
 
     return null;
@@ -270,8 +289,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     telefon: string,
     email: string,
     password: string
-  ): Promise<{ success: boolean; error?: string; user?: AuthUser | null }> => {
-    if (!ad || !soyad || !telefon || !email || !password) {
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    user?: AuthUser | null;
+    requiresEmailConfirmation?: boolean;
+  }> => {
+    const cleanEmail = email.trim();
+    if (!ad || !soyad || !telefon || !cleanEmail || !password) {
       return { success: false, error: "Lütfen tüm alanları doldurunuz." };
     }
 
@@ -284,7 +309,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password,
         options: {
           data: {
@@ -297,6 +322,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) {
         console.warn("E-posta kayıt uyarısı:", error.message);
+        if (error.message.toLowerCase().includes("already registered")) {
+          return {
+            success: false,
+            error: "Bu e-posta adresi ile zaten bir hesap bulunmaktadır. Lütfen giriş yapınız.",
+          };
+        }
         return {
           success: false,
           error: "Kayıt işlemi gerçekleştirilemedi. Lütfen bilgilerinizi kontrol ediniz.",
@@ -312,8 +343,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         );
         if (data.session) {
           get().setUser(profile, false);
+          return { success: true, user: profile, requiresEmailConfirmation: false };
         }
-        return { success: true, user: profile };
+        return { success: true, user: profile, requiresEmailConfirmation: true };
       }
     } catch (err: unknown) {
       console.warn("E-posta kayıt hatası:", err);
@@ -391,15 +423,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const nextParam = redirectToPath ? `?next=${encodeURIComponent(redirectToPath)}` : "";
       const redirectTo = `${origin}/auth/callback${nextParam}`;
 
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
+          queryParams: {
+            prompt: "select_account",
+          },
         },
       });
 
       if (error) {
         return { error: error.message };
+      }
+      if (data?.url && typeof window !== "undefined") {
+        window.location.assign(data.url);
       }
       return { user: null };
     } catch (err: unknown) {

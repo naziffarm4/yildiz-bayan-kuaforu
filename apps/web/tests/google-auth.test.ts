@@ -1,8 +1,51 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { useAuthStore } from "@/stores/auth-store";
+
+const mockSignInWithOAuth = vi.fn();
+
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({
+    auth: {
+      signInWithOAuth: mockSignInWithOAuth,
+    },
+  }),
+}));
 
 describe("Google OAuth Hata Yönetimi & Dev Fallback Mantığı", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("loginWithGoogle select_account parametresiyle OAuth başlatır ve data.url varsa tarayıcıyı yönlendirir", async () => {
+    const assignMock = vi.fn();
+    vi.stubGlobal("window", {
+      location: {
+        origin: "https://yildizkuafor.com",
+        assign: assignMock,
+      },
+    });
+
+    mockSignInWithOAuth.mockResolvedValue({
+      data: { url: "https://accounts.google.com/o/oauth2/v2/auth?client_id=test" },
+      error: null,
+    });
+
+    const res = await useAuthStore.getState().loginWithGoogle("/randevu");
+
+    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: "https://yildizkuafor.com/auth/callback?next=%2Frandevu",
+        queryParams: {
+          prompt: "select_account",
+        },
+      },
+    });
+    expect(assignMock).toHaveBeenCalledWith(
+      "https://accounts.google.com/o/oauth2/v2/auth?client_id=test"
+    );
+    expect(res.error).toBeUndefined();
+    vi.unstubAllGlobals();
   });
 
   it("Provider kapalı hatası ('provider is not enabled') geliştirme ortamında tespit edilir", () => {

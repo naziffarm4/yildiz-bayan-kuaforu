@@ -64,6 +64,28 @@ describe("Faz 3: Güvenlik Başlıkları, Görsel Optimizasyonu ve SEO Yapıland
       expect(headerMap.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline';");
       expect(headerMap.get("Content-Security-Policy")).not.toContain("'unsafe-eval'");
     });
+
+    it("Geliştirme ortamında (NODE_ENV=development) Next.js Webpack hydration için script-src içinde 'unsafe-eval' izin verir, üretimde kaldırır", async () => {
+      const originalEnv = process.env.NODE_ENV;
+      try {
+        (process.env as Record<string, string | undefined>).NODE_ENV = "development";
+        const devRules = await nextConfig.headers!();
+        const devCsp = devRules[0].headers.find(
+          (h: { key: string }) => h.key === "Content-Security-Policy"
+        )?.value;
+        expect(devCsp).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval';");
+
+        (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+        const prodRules = await nextConfig.headers!();
+        const prodCsp = prodRules[0].headers.find(
+          (h: { key: string }) => h.key === "Content-Security-Policy"
+        )?.value;
+        expect(prodCsp).toContain("script-src 'self' 'unsafe-inline';");
+        expect(prodCsp).not.toContain("'unsafe-eval'");
+      } finally {
+        (process.env as Record<string, string | undefined>).NODE_ENV = originalEnv;
+      }
+    });
   });
 
   describe("sitemap.ts (Dinamik Site Haritası)", () => {

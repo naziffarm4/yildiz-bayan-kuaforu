@@ -25,7 +25,7 @@ export function ContactMapSkeleton() {
 
 export function ContactMapEmbed({ adres, googleHaritaUrl, transitNote }: ContactMapEmbedProps) {
   // Google Maps embed URL
-  const encodedAddress = encodeURIComponent(adres || "Bağdat Caddesi No: 342, Kadıköy / İstanbul");
+  const encodedAddress = encodeURIComponent(adres || "Köprübaşı Mah., Melik Sok., 1D, Serdivan/Sakarya");
   const embedSrc = `https://maps.google.com/maps?q=${encodedAddress}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
 
   return (

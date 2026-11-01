@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Hizmetler & Lüks Saç Tasarım Kataloğu | Yıldız Bayan Kuaförü",
     description:
-      "Kadıköy Bağdat Caddesi'nde kişiye özel saç tasarım, renklendirme ve bakım hizmetlerimizi keşfedin.",
+      "Serdivan / Sakarya'da kişiye özel saç tasarım, renklendirme ve bakım hizmetlerimizi keşfedin.",
     url: "/hizmetler",
   },
 };

@@ -9,9 +9,9 @@ import {
 export const SALON_INFO: SalonInfo = {
   ad: "YILDIZ BAYAN KUAFÖRÜ",
   slogan: "Zarif Dokunuşlar, Kusursuz Güzellik",
-  adres: "Bağdat Caddesi No: 284/A, Kadıköy / İstanbul",
-  telefon: "+90 216 555 00 00",
-  whatsapp: "+90 532 999 10 20",
+  adres: "Köprübaşı Mah., Melik Sok., 1D, Serdivan/Sakarya",
+  telefon: "+90 505 425 42 78",
+  whatsapp: "+90 505 425 42 78",
   eposta: "randevu@yildizkuafor.com",
   googleHaritaUrl: "https://maps.google.com/?cid=8333635848754942930",
   instagram: "@yildizbayankuaforu",
@@ -27,7 +27,7 @@ export const SALON_INFO: SalonInfo = {
 
 export const DEFAULT_PAGE_TEXTS: PageTexts = {
   hero: {
-    badge: "Kadıköy & Bağdat Caddesi Butik Salon",
+    badge: "Köprübaşı & Melik Sokak Butik Salon",
     altRozet: "Randevulu Özel Hizmet",
     title: "Zarafet ve Ustalığın",
     titleHighlight: "Kişiselleştirilmiş",
@@ -130,15 +130,15 @@ export const DEFAULT_PAGE_TEXTS: PageTexts = {
     storyTitle:
       "Standart Kuaför Kalıplarının Ötesinde, Sadece Size Ayrılmış Bir Zaman Dilimi",
     storyText:
-      "YILDIZ BAYAN KUAFÖRÜ, İstanbul'un kalbi Bağdat Caddesi'nde, kalabalık ve gürültülü salon alışkanlıklarını geride bırakmak amacıyla kuruldu. Amacımız fabrikasyon kesim ve boyalar değil; yüz hatlarınızı, ten alt tonunuzu ve yaşam tarzınızı kusursuzca yansıtan haute couture saç tasarımları üretmektir.",
+      "YILDIZ BAYAN KUAFÖRÜ, Sakarya Serdivan'da, kalabalık ve gürültülü salon alışkanlıklarını geride bırakmak amacıyla kuruldu. Amacımız fabrikasyon kesim ve boyalar değil; yüz hatlarınızı, ten alt tonunuzu ve yaşam tarzınızı kusursuzca yansıtan haute couture saç tasarımları üretmektir.",
     manifestoTitle: "Kuruluş & Felsefe",
   },
   contact: {
     welcomeTitle: "Salonumuzda Sizi Ağırlamaktan Mutluluk Duyarız",
     welcomeSubtitle:
-      "Bağdat Caddesi'ndeki butik salonumuza kolayca ulaşabilir veya tek tıkla doğrudan randevu oluşturabilirsiniz.",
+      "Serdivan Köprübaşı'ndaki butik salonumuza kolayca ulaşabilir veya tek tıkla doğrudan randevu oluşturabilirsiniz.",
     transitNote:
-      "Göztepe Parkı ve Caddebostan sahiline 5 dakika yürüme mesafesinde. Özel vale ve otopark hizmetimiz mevcuttur.",
+      "Serdivan Köprübaşı Mahallesi Melik Sokak'ta merkezi konumda. Özel araç ve toplu taşıma ile kolay ulaşım, otopark imkanı mevcuttur.",
   },
 };
 

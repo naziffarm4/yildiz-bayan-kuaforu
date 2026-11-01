@@ -71,6 +71,6 @@ describe("Mock Veri ve Model Uyumluluğu", () => {
     expect(() => SalonInfoSchema.parse(SALON_INFO)).not.toThrow();
     expect(SALON_INFO.facebook).toBeDefined();
     expect(SALON_INFO.whatsapp).toBeDefined();
-    expect(SALON_INFO.telefon).toBe("+90 216 555 00 00");
+    expect(SALON_INFO.telefon).toBe("+90 505 425 42 78");
   });
 });

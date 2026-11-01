@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "İletişim, Adres & Çalışma Saatleri",
   description:
-    "Yıldız Bayan Kuaförü Kadıköy Bağdat Caddesi adres bilgileri, yol tarifi, telefon, WhatsApp randevu hattı ve çalışma saatleri.",
+    "Yıldız Bayan Kuaförü Serdivan / Sakarya adres bilgileri, yol tarifi, telefon, WhatsApp randevu hattı ve çalışma saatleri.",
   alternates: {
     canonical: "/iletisim",
   },

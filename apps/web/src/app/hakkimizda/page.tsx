@@ -13,6 +13,7 @@ import { useAppStore } from "@/stores/app-store";
 export default function AboutPage() {
   const bootstrapApp = useAppStore((s) => s.bootstrapApp);
   const pageTexts = useAppStore((s) => s.pageTexts);
+  const salonInfo = useAppStore((s) => s.salonInfo);
   const isInitialLoaded = useAppStore((s) => s.isInitialLoaded);
   const isRefreshing = useAppStore((s) => s.isRefreshing);
   const about = pageTexts.about;
@@ -60,7 +61,7 @@ export default function AboutPage() {
               </div>
               <div className="absolute -bottom-6 -right-6 bg-white p-6 rounded-2xl border border-border shadow-lg hidden sm:block max-w-xs">
                 <span className="text-[11px] font-bold text-accent-gold uppercase tracking-wider block mb-1">
-                  Bağdat Caddesi
+                  {pageTexts.hero?.badge || salonInfo.ad || "Haute Coiffure"}
                 </span>
                 <p className="text-xs text-text-secondary leading-snug">
                   Her dokunuşta sanatsal vizyon, her randevuda kişiselleştirilmiş dinginlik.

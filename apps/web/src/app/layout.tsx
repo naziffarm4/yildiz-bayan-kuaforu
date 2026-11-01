@@ -19,11 +19,11 @@ export const metadata: Metadata = {
     template: "%s | Yıldız Bayan Kuaförü",
   },
   description:
-    "Kadıköy Bağdat Caddesi'nde lüks saç tasarımı, balyaj, röfle, gelin saçı ve profesyonel kuaför hizmetleri. Sıra beklemeden online randevunuzu oluşturun.",
+    "Serdivan / Sakarya'da lüks saç tasarımı, balyaj, röfle, gelin saçı ve profesyonel kuaför hizmetleri. Sıra beklemeden online randevunuzu oluşturun.",
   keywords: [
     "Yıldız Bayan Kuaförü",
-    "Kadıköy bayan kuaförü",
-    "Bağdat Caddesi kuaför",
+    "Serdivan bayan kuaförü",
+    "Sakarya kuaför",
     "balyaj",
     "gelin saçı",
     "saç kesimi",
@@ -39,13 +39,13 @@ export const metadata: Metadata = {
     siteName: SALON_INFO.ad,
     title: "Yıldız Bayan Kuaförü | Zarif Dokunuşlar, Kusursuz Güzellik",
     description:
-      "Kadıköy Bağdat Caddesi'nde kişiselleştirilmiş lüks saç tasarımı ve online randevu platformu.",
+      "Serdivan / Sakarya'da kişiselleştirilmiş lüks saç tasarımı ve online randevu platformu.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Yıldız Bayan Kuaförü | Lüks Saç Tasarım & Online Randevu",
     description:
-      "Kadıköy Bağdat Caddesi'nde kişiselleştirilmiş lüks saç tasarımı ve online randevu platformu.",
+      "Serdivan / Sakarya'da kişiselleştirilmiş lüks saç tasarımı ve online randevu platformu.",
   },
 };
 
@@ -60,8 +60,8 @@ const salonJsonLd = {
   address: {
     "@type": "PostalAddress",
     streetAddress: SALON_INFO.adres,
-    addressLocality: "Kadıköy",
-    addressRegion: "İstanbul",
+    addressLocality: "Serdivan",
+    addressRegion: "Sakarya",
     addressCountry: "TR",
   },
   hasMap: SALON_INFO.googleHaritaUrl,

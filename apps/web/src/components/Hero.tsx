@@ -38,7 +38,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-bg-primary border border-primary/30 shadow-xs backdrop-blur-xs">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
-                {hero.badge || "Kadıköy & Bağdat Caddesi Butik Salon"}
+                {hero.badge || "Köprübaşı & Melik Sokak Butik Salon"}
               </span>
               <span className="text-dark/30 text-xs hidden sm:inline">•</span>
               <span className="text-[11px] text-dark/70 hidden sm:inline font-semibold">
@@ -183,7 +183,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
                   15+ Yıl Ustalık
                 </span>
                 <span className="text-[10px] text-dark/70 mt-1 block font-medium">
-                  Bağdat Caddesi Butik Salon
+                  {hero.badge || "Serdivan Butik Salon"}
                 </span>
               </div>
             </div>

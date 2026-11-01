@@ -139,7 +139,7 @@ export const SplitBannerSection: React.FC<SplitBannerSectionProps> = ({
               {about?.founder || "Yıldız Bayan Kuaförü — Kurucu & Master Stilist"}
             </span>
             <span className="text-[11px] text-white/85 mt-1 block font-medium">
-              Bağdat Caddesi Butik Salon
+              {about?.manifestoTitle || "Haute Coiffure & Butik Salon"}
             </span>
           </div>
         </div>

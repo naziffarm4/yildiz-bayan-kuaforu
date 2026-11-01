@@ -37,7 +37,7 @@ export const Footer: React.FC = () => {
               &ldquo;{salonInfo.slogan}&rdquo;
             </p>
             <p className="text-xs text-text-secondary leading-relaxed">
-              Kadıköy Bağdat Caddesi’nde lüks butik kuaför ve editorial saç tasarım salonu.
+              Kişiye özel lüks butik kuaför ve editorial saç tasarım salonu.
             </p>
           </div>
 

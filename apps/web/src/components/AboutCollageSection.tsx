@@ -4,6 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@yildiz/ui";
+import { useContent } from "@/lib/content-context";
 
 interface AboutCollageSectionProps {
   onOpenBooking: () => void;
@@ -12,6 +13,7 @@ interface AboutCollageSectionProps {
 export const AboutCollageSection: React.FC<AboutCollageSectionProps> = ({
   onOpenBooking,
 }) => {
+  const { pageTexts } = useContent();
   const collagePhotos = [
     {
       url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80",
@@ -171,7 +173,8 @@ export const AboutCollageSection: React.FC<AboutCollageSectionProps> = ({
             </div>
 
             <p className="text-xs sm:text-sm text-dark/80 leading-relaxed font-medium">
-              YILDIZ BAYAN KUAFÖRÜ, Bağdat Caddesi&apos;nde kalabalık ve gürültülü salon telaşını geride bırakmanız için tasarlandı. Sıra beklemeden, yalnızca sizin için ayrılan sakin bir zaman diliminde dünya standartlarında saç tasarımının ayrıcalığını yaşayın.
+              {pageTexts.about?.storyText ||
+                "YILDIZ BAYAN KUAFÖRÜ, kalabalık ve gürültülü salon telaşını geride bırakmanız için tasarlandı. Sıra beklemeden, yalnızca sizin için ayrılan sakin bir zaman diliminde dünya standartlarında saç tasarımının ayrıcalığını yaşayın."}
             </p>
 
             {/* Maddeleme Listesi (BeautyZone Feature Cards) */}

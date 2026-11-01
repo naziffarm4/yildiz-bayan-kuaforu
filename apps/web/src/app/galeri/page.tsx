@@ -19,6 +19,7 @@ export default function GalleryPage() {
   const likedIds = useAppStore((s) => s.likedGalleryIds);
   const isRefreshing = useAppStore((s) => s.isRefreshing);
   const pageTexts = useAppStore((s) => s.pageTexts);
+  const salonInfo = useAppStore((s) => s.salonInfo);
 
   const fetchComments = useAppStore((s) => s.fetchGalleryComments);
   const toggleLike = useAppStore((s) => s.toggleGalleryLike);
@@ -330,9 +331,8 @@ export default function GalleryPage() {
                 {/* Stilist & Lokasyon Bilgi Satırı */}
                 <div className="mt-4 pt-3 border-t border-border-main/80 flex items-center justify-between text-xs text-text-secondary">
                   <span>
-                    Stilist: <strong className="text-text-primary">{selectedPhoto.stilist || "Yıldız Bayan Kuaförü"}</strong>
+                    Stilist: <strong className="text-text-primary">{selectedPhoto.stilist || salonInfo.ad || "Yıldız Bayan Kuaförü"}</strong>
                   </span>
-                  <span>Bağdat Caddesi</span>
                 </div>
 
                 {/* İnteraktif Beğeni Çubuğu */}

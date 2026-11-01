@@ -16,10 +16,11 @@ import { Badge } from "./badge";
 
 export interface BookingWizardModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose?: () => void;
   services: ServiceItem[];
   initialSelectedServiceId?: string | null;
   onAppointmentCreated: (appointment: AppointmentItem) => void | Promise<void>;
+  inline?: boolean;
 }
 
 const ALL_TIME_SLOTS = [
@@ -53,6 +54,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   services,
   initialSelectedServiceId,
   onAppointmentCreated,
+  inline = false,
 }) => {
   const modalId = useId();
 
@@ -97,16 +99,27 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [createdAppointment, setCreatedAppointment] = useState<AppointmentItem | null>(null);
   const [blockCountdown, setBlockCountdown] = useState<number>(30 * 60);
 
-  // ESC tuşu ile kapatma
+  // ESC tuşu ile kapatma (yalnızca popup modunda)
   useEffect(() => {
+    if (inline) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape" && isOpen && onClose) {
         onClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, inline]);
+
+  const handleResetForm = () => {
+    setStep(1);
+    setSelectedServiceIds([]);
+    setSelectedTime("");
+    setSmsSent(false);
+    setEnteredSmsCode("");
+    setCreatedAppointment(null);
+    setFormError(null);
+  };
 
   // Önceden seçilmiş hizmet varsa ekle
   useEffect(() => {
@@ -244,28 +257,23 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={`${modalId}-title`}
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
-    >
-      <div className="relative w-full max-w-2xl bg-bg-primary rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Modal Başlık ve Adım Göstergesi */}
-        <div className="px-6 py-5 border-b border-border bg-bg-secondary flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-accent-gold block">
-              VIP Online Randevu Masası
-            </span>
-            <h2 id={`${modalId}-title`} className="font-serif text-xl font-bold text-text-primary">
-              {step === 1 && "Adım 1: Hizmet Seçimi"}
-              {step === 2 && "Adım 2: Randevu Tarihi & Saati"}
-              {step === 3 && "Adım 3: İletişim Bilgileri & SMS Onayı"}
-              {step === 4 && "Adım 4: Randevu Alındı"}
-            </h2>
-          </div>
+  const innerCard = (
+    <>
+      {/* Modal Başlık ve Adım Göstergesi */}
+      <div className="px-6 py-5 border-b border-border bg-bg-secondary flex items-center justify-between">
+        <div>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-accent-gold block">
+            VIP Online Randevu Masası
+          </span>
+          <h2 id={`${modalId}-title`} className="font-serif text-xl font-bold text-text-primary">
+            {step === 1 && "Adım 1: Hizmet Seçimi"}
+            {step === 2 && "Adım 2: Randevu Tarihi & Saati"}
+            {step === 3 && "Adım 3: İletişim Bilgileri & SMS Onayı"}
+            {step === 4 && "Adım 4: Randevu Alındı"}
+          </h2>
+        </div>
 
+        {!inline && onClose && (
           <button
             type="button"
             onClick={onClose}
@@ -274,24 +282,25 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           >
             ✕
           </button>
-        </div>
+        )}
+      </div>
 
-        {/* 4 Adımlı İlerleme Çubuğu */}
+      {/* 4 Adımlı İlerleme Çubuğu */}
+      <div
+        className="w-full bg-border-main h-1.5"
+        role="progressbar"
+        aria-valuenow={step}
+        aria-valuemin={1}
+        aria-valuemax={4}
+      >
         <div
-          className="w-full bg-border-main h-1.5"
-          role="progressbar"
-          aria-valuenow={step}
-          aria-valuemin={1}
-          aria-valuemax={4}
-        >
-          <div
-            className="bg-accent-gold h-1.5 transition-all duration-300"
-            style={{ width: `${(step / 4) * 100}%` }}
-          />
-        </div>
+          className="bg-accent-gold h-1.5 transition-all duration-300"
+          style={{ width: `${(step / 4) * 100}%` }}
+        />
+      </div>
 
-        {/* Modal Gövde */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+      {/* Modal Gövde */}
+      <div className={`p-6 ${inline ? "" : "overflow-y-auto"} flex-1 space-y-6`}>
           {/* ADIM 1: ÇOKLU HİZMET SEÇİMİ */}
           {step === 1 && (
             <div className="space-y-4">
@@ -691,12 +700,41 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             )}
 
             {step === 4 && (
-              <Button variant="primary" size="md" onClick={onClose}>
-                Tamamla ve Kapat
-              </Button>
+              inline ? (
+                <Button variant="primary" size="md" onClick={handleResetForm}>
+                  Yeni Randevu Oluştur
+                </Button>
+              ) : (
+                <Button variant="primary" size="md" onClick={onClose}>
+                  Tamamla ve Kapat
+                </Button>
+              )
             )}
           </div>
         </div>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div
+        className="w-full max-w-3xl mx-auto bg-bg-primary rounded-2xl border border-border shadow-lg overflow-hidden flex flex-col"
+        aria-labelledby={`${modalId}-title`}
+      >
+        {innerCard}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={`${modalId}-title`}
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+    >
+      <div className="relative w-full max-w-2xl bg-bg-primary rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {innerCard}
       </div>
     </div>
   );

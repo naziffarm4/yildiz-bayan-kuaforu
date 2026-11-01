@@ -52,10 +52,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col max-w-full overflow-x-clip bg-bg-primary text-text-primary selection:bg-primary/20 selection:text-text-primary pb-16 md:pb-0">
       {/* Üst Navigasyon & TopBar */}
-      <Navbar
-        onOpenBooking={handleOpenBooking}
-        onOpenTracker={handleScrollToTracker}
-      />
+      <Navbar onOpenTracker={handleScrollToTracker} />
 
       <main className="flex-1">
         {/* 1. HERO (GİRİŞ) BÖLÜMÜ - BEAUTYZONE ÇİFT KATMANLI TİPOGRAFİ & LÜKS GÖRSEL */}

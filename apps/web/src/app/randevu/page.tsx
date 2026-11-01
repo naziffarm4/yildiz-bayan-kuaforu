@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PageLoader } from "@/components/PageLoader";
 import { AppointmentTracker } from "@/components/AppointmentTracker";
-import { Badge, Button, BookingWizardModal } from "@yildiz/ui";
+import { Badge, BookingWizardModal } from "@yildiz/ui";
 import { useAppStore } from "@/stores/app-store";
 import { useCreateAppointment } from "@/hooks/use-create-appointment";
 
@@ -19,11 +19,13 @@ function RandevuContent() {
   const isRefreshing = useAppStore((s) => s.isRefreshing);
 
   const { appointments, handleAppointmentCreated } = useCreateAppointment();
-  const [isWizardOpen, setIsWizardOpen] = useState(true);
 
-  useEffect(() => {
-    setIsWizardOpen(true);
-  }, [preselectedServiceId]);
+  const handleScrollToBookingForm = () => {
+    const el = document.getElementById("randevu-formu");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   if (!isInitialLoaded && isRefreshing) {
     return <PageLoader variant="modal" message="Randevu masası hazırlanıyor..." />;
@@ -31,7 +33,7 @@ function RandevuContent() {
 
   return (
     <div className="min-h-screen flex flex-col max-w-full overflow-x-clip bg-bg-primary text-text-primary pb-16 md:pb-0">
-      <Navbar onOpenBooking={() => setIsWizardOpen(true)} />
+      <Navbar />
 
       <main className="flex-1 pt-8 sm:pt-12 pb-12 sm:pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
         {/* Başlık */}
@@ -44,33 +46,24 @@ function RandevuContent() {
             İstediğiniz bakım ve tasarım hizmetlerini seçin. Sistemimiz randevu sürenize özel 15 dakikalık
             tampon süreyi otomatik olarak ekler ve beklemeden koltuğunuza geçmenizi sağlar.
           </p>
+        </div>
 
-          <div className="pt-2">
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setIsWizardOpen(true)}
-              className="shadow-sm"
-            >
-              ⚡ Randevu Sihirbazını Başlat
-            </Button>
-          </div>
+        {/* Sayfa İçi Gömülü 4 Adımlı Randevu Sihirbazı */}
+        <div id="randevu-formu" className="mb-14">
+          <BookingWizardModal
+            isOpen={true}
+            inline={true}
+            services={services}
+            initialSelectedServiceId={preselectedServiceId}
+            onAppointmentCreated={handleAppointmentCreated}
+          />
         </div>
 
         {/* Randevu Sorgulama / Durum Kutusu */}
         <AppointmentTracker
           appointments={appointments}
           services={services}
-          onOpenBooking={() => setIsWizardOpen(true)}
-        />
-
-        {/* İnteraktif 4 Adımlı Randevu Sihirbazı */}
-        <BookingWizardModal
-          isOpen={isWizardOpen}
-          onClose={() => setIsWizardOpen(false)}
-          services={services}
-          initialSelectedServiceId={preselectedServiceId}
-          onAppointmentCreated={handleAppointmentCreated}
+          onOpenBooking={handleScrollToBookingForm}
         />
       </main>
 

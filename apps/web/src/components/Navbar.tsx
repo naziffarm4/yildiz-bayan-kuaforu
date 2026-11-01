@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@yildiz/ui";
 import { formatFacebookUrl } from "@yildiz/types";
 import { useAuth } from "../lib/auth-context";
@@ -19,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking, onOpenTracker: _o
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
   const { salonInfo } = useContent();
 
@@ -61,6 +62,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking, onOpenTracker: _o
     setMobileMenuOpen(false);
     if (onOpenBooking) {
       onOpenBooking();
+      return;
+    }
+    if (pathname === "/randevu") {
+      const el = document.getElementById("randevu-formu");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      }
+    } else {
+      router.push("/randevu");
     }
   };
 
